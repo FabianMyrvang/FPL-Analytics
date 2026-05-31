@@ -29,17 +29,12 @@ import numpy as np
 pd.set_option('display.max_columns', None)
 
 # Fuzzy matching
-from thefuzz import fuzz, process
 from rapidfuzz import process, fuzz
 
-import git
-import os
 from time import sleep
 from datetime import datetime
 import json
 import ast
-
-
 import requests
 
 # %%
@@ -92,8 +87,6 @@ def get_current_season(today=None):
 
 
 # %%
-os.makedirs("Data", exist_ok=True)
-
 BASE_URL = "https://fantasy.premierleague.com/api"
 
 def fetch_json(endpoint):
@@ -319,13 +312,13 @@ def creating_player_ids(new_players : pd.DataFrame, old_players : pd.DataFrame):
     # Count how many times each web_name appears
     web_counts = all_players['web_name'].value_counts()
 
-# Default: use web_name
+    # Default: use web_name
     all_players['player_name'] = all_players['web_name']
 
-# Rows where web_name is duplicated
+    # Rows where web_name is duplicated
     mask = all_players['web_name'].map(web_counts).gt(1)
 
-# For duplicated web_names, use "F. Lastname" from full_name
+    # For duplicated web_names, use "F. Lastname" from full_name
     all_players.loc[mask, 'player_name'] = (
         all_players.loc[mask, 'full_name']
         .astype(str)
@@ -551,36 +544,3 @@ season_dim.to_csv("FPL_DATA/season_dim.csv", index=False)
 
 fpl_fixture_fact.to_csv("FPL_DATA/fpl_fixture_fact.csv",index= False)
 fpl_gameweek_fact.to_csv("FPL_DATA/fpl_gameweek_fact.csv", index=False)
-
-# %%
-"""
-def main():
-    global master_player_stats_table, master_fixtures_table
-    
-    player_dim = creating_player_ids(fpl_api_players, players_df)
-    team_dim = team_merge(fpl_api_teams, teams_df)
-    position_dim = positions_df
-    
-    master_player_stats_table = map_player_ids(master_player_stats_table, player_dim)
-    master_player_stats_table = team_transformer(master_player_stats_table, fpl_api_teams, teams_df)
-    
-    master_fixtures_table = team_transformer(master_fixtures_table, fpl_api_teams, teams_df)
-    
-    fpl_gameweek_fact = concat_gameweek_stats(master_player_stats_table, fpl20_24, FPL_GAMEWEEK_COLS)
-    fixture_dim = concat_gameweek_stats(master_fixtures_table, fixtures_df, FIXTURES_COLS)
-    season_dim = concat_gameweek_stats(master_fixtures_table, fixtures_df, SEASON_COLS).drop_duplicates().reset_index(drop=True)
-    fpl_fixture_fact = concat_gameweek_stats(master_fixtures_table, fixtures_stats20_24, FIXTURES_STATS_COLS)
-    
-    player_dim.to_csv("FPL_DATA/player_dim.csv", index=False)
-    position_dim.to_csv("FPL_DATA/position_dim.csv", index=False)
-    team_dim.to_csv("FPL_DATA/team_dim.csv", index=False)
-    fixture_dim.to_csv("FPL_DATA/fixture_dim.csv", index=False)
-    season_dim.to_csv("FPL_DATA/season_dim.csv", index=False)
-    fpl_fixture_fact.to_csv("FPL_DATA/fpl_fixture_fact.csv", index=False)
-    fpl_gameweek_fact.to_csv("FPL_DATA/fpl_gameweek_fact.csv", index=False)
-    
-    print("Pipeline completed")
-
-if __name__ == "__main__":
-    main()
-"""

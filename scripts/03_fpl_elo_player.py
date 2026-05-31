@@ -21,23 +21,6 @@ from pathlib import Path
 if Path.cwd().name in ("notebooks", "scripts"):
     os.chdir(Path.cwd().parent)
 
-# %% [markdown]
-# ### FPL ELO DATASET
-#
-# Files used:
-# Files used:  
-# * playermatchstats.csv:  
-#   Individual player performance for each match within that gameweek.  
-#
-# * player_gameweek_stats.csv:  
-#   A summary of each player's performance specifically for that gameweek.
-#
-#
-# To do list:
-# Read in the playermatch stats for season 24 and 25 and get Gameweek info from matches data.
-#
-#
-
 # %%
 # Data handling
 import pandas as pd
@@ -145,12 +128,6 @@ elo_teams = pd.read_csv(f"{ELO_DATA_DIR}/teams.csv")
 elo_path = f"{ELO_DATA_DIR}/By Tournament/Premier League/"
 
 
-# %%
-elo_players = pd.read_csv(f"{ELO_DATA_DIR}/players.csv")
-elo_teams = pd.read_csv(f"{ELO_DATA_DIR}/teams.csv")
-elo_path = f"{ELO_DATA_DIR}/By Tournament/Premier League/"
-
-
 elo_fixtures_25 = []
 
 for gw in range(1, 39):
@@ -189,8 +166,7 @@ elo_fixtures_25 = pd.merge(elo_fixtures_25,team_dim,how = "left", left_on="home_
 elo_fixtures_25 = pd.merge(elo_fixtures_25,team_dim,how = "left", left_on="away_team_name", right_on="team").drop(columns=["team"]).rename(columns={"team_id":"away_team_id"})
 
 # %%
-# Match_id 
-#elo_fixtures_25["match_id"] = "2025-26-" + elo_fixtures_25["home_team_name"]+"-" + elo_fixtures_25["away_team_name"]
+# Match_id
 elo_fixtures_25["season"] = SEASON_SHORT
 elo_fixtures_25['match_id'] = (elo_fixtures_25['season'].str[:4] + elo_fixtures_25["home_team_id"].astype(str).str.zfill(2) + elo_fixtures_25['away_team_id'].astype(str).str.zfill(2)).astype('Int64')
 
@@ -205,9 +181,6 @@ elo_fixtures_25 = elo_fixtures_25[[col for col in elo_fixtures_25.columns if 'pc
 
 # Remove all columns where the NaN percentage is above 0.1
 elo_fixtures_25 = elo_fixtures_25.loc[:, (elo_fixtures_25.isna().sum() / len(elo_fixtures_25)) <= 0.1]
-
-# %%
-#elo_fixtures_25 = elo_fixtures_25[ELO_FIXTURES_COLS]
 
 # %%
 upsert_csv(elo_fixtures_25, "FPL_DATA/elo_fixture_fact.csv", keys=["match_id"])
@@ -319,12 +292,7 @@ elo_25['gw_id'] = elo_25['match_id'].astype(str).str[:4].astype(int) * 100 + elo
 elo_25["was_home"] = (elo_25["team_id"] == elo_25["home_team_id"]).astype(int)
 
 # %%
-#elo_25 = elo_25.drop(columns=["GW","home_team","away_team","full_name","home_team_name","away_team_name"])¨
-
 elo_25 = elo_25[ELO_PLAYER_COLS]
 
 # %%
 upsert_csv(elo_25, "FPL_DATA/elo_gameweek_fact.csv", keys=["match_id", "player_id"])
-
-# %%
-elo_25[["accurate_passes", "gw_id"]]

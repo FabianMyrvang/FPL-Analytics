@@ -48,71 +48,38 @@ os.makedirs("seed_data", exist_ok=True)
 
 
 # %%
-def fpl_merge_func(season20, teams20, season21, teams21, season22, teams22, season23, teams23):
-    # Load all season data
-    df_20 = pd.read_csv(season20).assign(season="2020-21")
-    df_21 = pd.read_csv(season21).assign(season="2021-22")
-    df_22 = pd.read_csv(season22).assign(season="2022-23")
-    df_23 = pd.read_csv(season23).assign(season="2023-24")
+def fpl_merge_func(seasons):
+    """Merge each season's gameweek data with its opponent team names.
 
-    # Load all teams data
-    teams20 = pd.read_csv(teams20)
-    teams21 = pd.read_csv(teams21)
-    teams22 = pd.read_csv(teams22)
-    teams23 = pd.read_csv(teams23)
+    `seasons` is a list of (season_label, gw_url, teams_url) tuples.
+    """
+    dfs = []
+    for season_label, gw_url, teams_url in seasons:
+        df = pd.read_csv(gw_url).assign(season=season_label)
+        teams = pd.read_csv(teams_url)
 
-    # Merge only opponent team name with clean column naming
-    df_20 = pd.merge(
-        df_20,
-        teams20[['id', 'name']].rename(columns={"name": "opp_team_name"}),
-        how="left",
-        left_on="opponent_team",
-        right_on="id"
-    ).drop(columns=["id"])
+        # Merge only opponent team name with clean column naming
+        df = pd.merge(
+            df,
+            teams[['id', 'name']].rename(columns={"name": "opp_team_name"}),
+            how="left",
+            left_on="opponent_team",
+            right_on="id"
+        ).drop(columns=["id"])
 
-    df_21 = pd.merge(
-        df_21,
-        teams21[['id', 'name']].rename(columns={"name": "opp_team_name"}),
-        how="left",
-        left_on="opponent_team",
-        right_on="id"
-    ).drop(columns=["id"])
+        dfs.append(df)
 
-    df_22 = pd.merge(df_22,teams22[['id', 'name']].rename(columns={"name": "opp_team_name"}),
-        how="left",
-        left_on="opponent_team",
-        right_on="id"
-    ).drop(columns=["id"])
-
-    df_23 = pd.merge(
-        df_23,
-        teams23[['id', 'name']].rename(columns={"name": "opp_team_name"}),
-        how="left",
-        left_on="opponent_team",
-        right_on="id"
-    ).drop(columns=["id"])
-
-    # Combine all into one DataFrame
-    fpl_all = pd.concat([df_20, df_21, df_22, df_23], ignore_index=True, sort=False)
-
-    return fpl_all
+    return pd.concat(dfs, ignore_index=True, sort=False)
 
 
 
 # %%
-fpl_merged_df = fpl_merge_func(
-    season20= f'{VAASTAV}/2020-21/gws/merged_gw.csv',
-    teams20=  f'{VAASTAV}/2020-21/teams.csv',
-
-    season21= f'{VAASTAV}/2021-22/gws/merged_gw.csv',
-    teams21=  f'{VAASTAV}/2021-22/teams.csv',
-
-    season22= f'{VAASTAV}/2022-23/gws/merged_gw.csv',
-    teams22=  f'{VAASTAV}/2022-23/teams.csv',
-
-    season23= f'{VAASTAV}/2023-24/gws/merged_gw.csv',
-    teams23=  f'{VAASTAV}/2023-24/teams.csv',
-    )
+fpl_merged_df = fpl_merge_func([
+    ("2020-21", f'{VAASTAV}/2020-21/gws/merged_gw.csv', f'{VAASTAV}/2020-21/teams.csv'),
+    ("2021-22", f'{VAASTAV}/2021-22/gws/merged_gw.csv', f'{VAASTAV}/2021-22/teams.csv'),
+    ("2022-23", f'{VAASTAV}/2022-23/gws/merged_gw.csv', f'{VAASTAV}/2022-23/teams.csv'),
+    ("2023-24", f'{VAASTAV}/2023-24/gws/merged_gw.csv', f'{VAASTAV}/2023-24/teams.csv'),
+])
 
 # %%
 # Since the season for 24-25 is not in the full_fpl dataset, we need to append this to the full dataset so that we have all the years from 2020-2024 season
@@ -241,21 +208,11 @@ positions_df = fpl20_24[[ 'position_id', 'position']].drop_duplicates().sort_val
 
 
 # %%
-def fpl_fixtures_func(fixtures20, teams20, fixtures21, teams21, fixtures22, teams22, fixtures23, teams23, fixtures24, teams24):
-    # Load fixtures
-    fix_20 = pd.read_csv(fixtures20).assign(season="2020-21")
-    fix_21 = pd.read_csv(fixtures21).assign(season="2021-22")
-    fix_22 = pd.read_csv(fixtures22).assign(season="2022-23")
-    fix_23 = pd.read_csv(fixtures23).assign(season="2023-24")
-    fix_24 = pd.read_csv(fixtures24).assign(season="2024-25")
+def fpl_fixtures_func(seasons):
+    """Merge each season's fixtures with home/away team names.
 
-    # Load teams
-    teams20 = pd.read_csv(teams20)
-    teams21 = pd.read_csv(teams21)
-    teams22 = pd.read_csv(teams22)
-    teams23 = pd.read_csv(teams23)
-    teams24 = pd.read_csv(teams24)
-
+    `seasons` is a list of (fixtures_url, teams_url, season_label) tuples.
+    """
     # Merge team names (home & away) with clean columns
     def merge_team_names(fix_df, teams_df):
         fix_df = fix_df.merge(
@@ -275,14 +232,14 @@ def fpl_fixtures_func(fixtures20, teams20, fixtures21, teams21, fixtures22, team
 
         return fix_df
 
-    fix_20 = merge_team_names(fix_20, teams20)
-    fix_21 = merge_team_names(fix_21, teams21)
-    fix_22 = merge_team_names(fix_22, teams22)
-    fix_23 = merge_team_names(fix_23, teams23)
-    fix_24 = merge_team_names(fix_24, teams24)
+    fixtures_list = []
+    for fixtures_url, teams_url, season_label in seasons:
+        fix_df = pd.read_csv(fixtures_url).assign(season=season_label)
+        teams = pd.read_csv(teams_url)
+        fixtures_list.append(merge_team_names(fix_df, teams))
 
     # Combine all
-    fixtures_all = pd.concat([fix_20, fix_21, fix_22, fix_23, fix_24], ignore_index=True, sort=False)
+    fixtures_all = pd.concat(fixtures_list, ignore_index=True, sort=False)
 
     fixtures_all = fixtures_all.drop(columns = ['minutes','code','finished', 'finished_provisional', 'provisional_start_time','started','pulse_id'])
     return fixtures_all
@@ -290,28 +247,15 @@ def fpl_fixtures_func(fixtures20, teams20, fixtures21, teams21, fixtures22, team
 
 
 # %%
-fixtures = fpl_fixtures_func(
-    fixtures20= f'{VAASTAV}/2020-21/fixtures.csv',
-    teams20=    f'{VAASTAV}/2020-21/teams.csv',
-
-    fixtures21= f'{VAASTAV}/2021-22/fixtures.csv',
-    teams21=    f'{VAASTAV}/2021-22/teams.csv',
-
-    fixtures22= f'{VAASTAV}/2022-23/fixtures.csv',
-    teams22=    f'{VAASTAV}/2022-23/teams.csv',
-
-    fixtures23= f'{VAASTAV}/2023-24/fixtures.csv',
-    teams23=    f'{VAASTAV}/2023-24/teams.csv',
-
-    fixtures24= f'{VAASTAV}/2024-25/fixtures.csv',
-    teams24=    f'{VAASTAV}/2024-25/teams.csv',
-    )
+fixtures = fpl_fixtures_func([
+    (f'{VAASTAV}/2020-21/fixtures.csv', f'{VAASTAV}/2020-21/teams.csv', "2020-21"),
+    (f'{VAASTAV}/2021-22/fixtures.csv', f'{VAASTAV}/2021-22/teams.csv', "2021-22"),
+    (f'{VAASTAV}/2022-23/fixtures.csv', f'{VAASTAV}/2022-23/teams.csv', "2022-23"),
+    (f'{VAASTAV}/2023-24/fixtures.csv', f'{VAASTAV}/2023-24/teams.csv', "2023-24"),
+    (f'{VAASTAV}/2024-25/fixtures.csv', f'{VAASTAV}/2024-25/teams.csv', "2024-25"),
+])
 
 # %%
-
-# gameweek ids
-#fixtures['gw_id'] = fixtures['season'].str[:4].astype(int) * 100 + fixtures['gw'].astype(int)
-
 fixtures['match_id'] = fixtures['season'] + "-" + fixtures['home_team_name'] + '-' + fixtures['away_team_name']
 
 fixtures = pd.merge(
@@ -331,11 +275,6 @@ fixtures = fixtures.rename(columns= {'team_h_score':'home_score', 'team_a_score'
 # Adjust gameweek column to have "Gameweek" in front of number
 fixtures["gameweek"] = 'Gameweek' + ' ' + fixtures['gw'].astype(str)
 
-# Overwriting the match_id cuz i needed to change it 
-#fixtures['match_id'] = (fixtures['season'].str[1:4] + fixtures["home_team_id"].astype(str).str.zfill(2) + fixtures['away_team_id'].astype(str).str.zfill(2))
-
-# adjusting gw column 
-#
 fixtures['gw_id'] = fixtures['match_id'].str[:4].astype('Int64') * 100 + fixtures['gw'].astype('Int64')
 
 
@@ -353,13 +292,8 @@ fpl20_24["match_id"] = (
 # realized i needed home_team_id and away_team_id
 fpl20_24 = pd.merge(fpl20_24, fixtures_df[["match_id","home_team_id","away_team_id"]], how = "left",on="match_id")
 
-# Overwriting the match_id cuz i needed to change it 
+# Overwriting the match_id cuz i needed to change it
 fpl20_24['match_id'] = (fpl20_24['season'].str[:4] + fpl20_24["home_team_id"].astype(str).str.zfill(2) + fpl20_24['away_team_id'].astype(str).str.zfill(2)).astype('Int64')
-
- # adjusting gw column 
-#fpl20_24['gw_id'] = fpl20_24['match_id'][:4].astype(int) * 100 + fpl20_24['GW'].astype(int)
-
-#fpl20_24['gw_id'] = fixtures['match_id'].str[:4].astype(int) * 100 + fixtures['gw'].astype(int)
 
 # gameweek ids
 fpl20_24['gw_id'] = fpl20_24['season'].str[:4].astype('Int64') * 100 + fpl20_24['GW'].astype('Int64')
@@ -426,17 +360,6 @@ for _, row in fixtures.iterrows():
 
 # Create the new table
 fixtures_stat_table = pd.DataFrame(stats_records)
-
-# %%
-"""
-# Add match_id, if was_home is true then "team" comes first, if else then "opp_team_name" comes first
-fpl20_24["match_id"] = (
-    fpl20_24["season"] + "-" + 
-    np.where(fpl20_24["was_home"], fpl20_24["team"], fpl20_24["opp_team_name"]) + "-" +
-    np.where(fpl20_24["was_home"], fpl20_24["opp_team_name"], fpl20_24["team"])
-)
-
-"""
 
 # %%
 fpl20_24 = fpl20_24.drop(columns= ['position','team','xP','kickoff_time','fixture','transfers_balance','was_home','team_a_score','team_h_score','season','opp_team_name','home_team_id',"away_team_id"])
