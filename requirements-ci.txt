@@ -1,0 +1,11 @@
+# Slim dependency set for the GitHub Actions data pipeline.
+# Only what 01_fpl_api + the active elo script import — no soccerdata/Selenium
+# stack (that is only needed by the experimental FBref variant).
+pandas==2.3.2
+numpy==2.3.3
+requests==2.33.1
+thefuzz==0.22.1
+rapidfuzz==3.14.1
+GitPython==3.1.45
+matplotlib==3.10.6
+seaborn==0.13.2
