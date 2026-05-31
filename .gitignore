@@ -19,8 +19,7 @@ FPL-Core-Insights/
 # vaastav archive — no longer needed locally (01_fpl_merge.py fetches directly from GitHub)
 Fantasy-Premier-League/
 
-# Generated seed data (rebuild with 01_fpl_merge.py + vaastav archive)
-seed_data/
+# seed_data/ is tracked — required input for 02_fpl_api.py
 
 # Cache directories
 pl_api_cache/
