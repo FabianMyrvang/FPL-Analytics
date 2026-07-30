@@ -326,7 +326,10 @@ def creating_player_ids(new_players : pd.DataFrame, old_players : pd.DataFrame):
         .str.split()
         .apply(lambda x: f"{x[0][0]}. {x[-1]}")
         )
-    
+
+    # Keep photo_url as the last column
+    all_players = all_players[[c for c in all_players.columns if c != 'photo_url'] + ['photo_url']]
+
     return all_players
 
 
@@ -366,7 +369,11 @@ def team_merge(new_teams : pd.DataFrame, old_teams : pd.DataFrame):
     
     # team id as integer
     all_teams['team_id'] = all_teams['team_id'].astype('Int64')
-    
+
+    # Drop the FPL internal 'code' column — it only ever populated for teams that
+    # debut after the seed was built, so it's mostly empty and unused downstream.
+    all_teams = all_teams.drop(columns=['code'], errors='ignore')
+
     return all_teams
 
 
