@@ -14,5 +14,3 @@ These files bootstrap the pipeline — they provide the persistent player/team I
 | `fixtures_stats.csv` | Per-match aggregated team stats |
 
 These are **static** — they don't change unless you regenerate them by running `scripts/01_fpl_merge.py` with a fresh clone of the vaastav archive. For normal pipeline runs, they're used as-is.
-
-See `docs/fpl_merge_pipeline.md` for full documentation.
