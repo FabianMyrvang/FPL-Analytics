@@ -15,9 +15,14 @@
 # %%
 # --- repo-root bootstrap: resolve paths relative to the project root ---
 # Lets this code find "FPL_DATA/", "FPL-Core-Insights/" etc. whether it is
-# run from notebooks/, scripts/, or the repo root.
+# run from notebooks/, scripts/, or the repo root. We chdir away from scripts/, so put it
+# on sys.path explicitly to keep `import common` working from either location.
 import os
+import sys
 from pathlib import Path
+_SCRIPTS_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 if Path.cwd().name in ("notebooks", "scripts"):
     os.chdir(Path.cwd().parent)
 
@@ -28,38 +33,12 @@ import numpy as np
 
 import git
 import os
-from datetime import datetime
 
-
-# --- season awareness: derive the current season from today's date ---
-# Mirrors 02_fpl_api.get_current_season(). A season that starts in August YYYY is
-# labelled "YYYY-YY" (short, used in match_id) and stored by FPL-Core-Insights
-# under the folder "YYYY-YYYY".
-def get_current_season(today=None):
-    today = today or datetime.now()
-    start_year = today.year if today.month >= 8 else today.year - 1
-    season_short  = f"{start_year}-{str(start_year + 1)[2:]}"   # e.g. "2025-26"
-    season_folder = f"{start_year}-{start_year + 1}"            # e.g. "2025-2026"
-    return season_short, season_folder
-
+from common import get_current_season, normalise_team_names, player_name_key, upsert_csv
 
 SEASON_SHORT, SEASON_FOLDER = get_current_season()
 ELO_DATA_DIR = f"FPL-Core-Insights/data/{SEASON_FOLDER}"
 print(f"Season: {SEASON_SHORT}  |  FPL-Core-Insights dir: {ELO_DATA_DIR}")
-
-
-# --- non-destructive upsert: accumulate seasons instead of overwriting ---
-# match_id is season-unique (prefixed with the season's start year), so older
-# seasons are preserved and the current season's rows win on a key collision.
-def upsert_csv(new_df, path, keys):
-    if os.path.exists(path):
-        base = pd.read_csv(path)
-        combined = pd.concat([base, new_df], ignore_index=True)
-        combined = combined.drop_duplicates(subset=keys, keep="last").reset_index(drop=True)
-    else:
-        combined = new_df
-    combined.to_csv(path, index=False)
-    return combined
 
 # %%
 # Read each CSV file
@@ -99,8 +78,18 @@ ELO_FIXTURES_COLS = ['match_id','gw_id','home_team_id', 'away_team_id','home_tea
        'away_aerial_duels_won', 'home_successful_dribbles',
        'away_successful_dribbles']
 
+# The written schema for elo_fixture_fact.csv: the stat columns above plus the descriptive
+# ones worth keeping. Deliberately excludes upstream internals that carry no analytical
+# value — home_team/away_team (raw source codes, already resolved to *_team_id),
+# match_url, fotmob_id, stats_processed, player_stats_processed, tournament, and GW
+# (duplicates `gameweek`, and gw_id already encodes it).
+ELO_FIXTURE_OUTPUT_COLS = ELO_FIXTURES_COLS + [
+    'gameweek', 'home_score', 'away_score', 'finished',
+    'home_team_name', 'away_team_name', 'season',
+]
 
-ELO_PLAYER_COLS = ['match_id','player_id','team_id', 'position_id', 'gw_id','was_home',
+
+ELO_PLAYER_COLS =['match_id','player_id','team_id', 'position_id', 'gw_id','was_home',
                    'total_shots', 'shots_on_target', 'successful_dribbles',
                    'big_chances_missed', 'touches_opposition_box', 'touches',
                    'accurate_passes', 'chances_created', 'final_third_passes',
@@ -114,21 +103,46 @@ ELO_PLAYER_COLS = ['match_id','player_id','team_id', 'position_id', 'gw_id','was
                    'penalties_scored' ]
 
 # %%
-# Pull latest FPL-Core-Insights data (repo must be cloned at the project root)
+# Pull latest FPL-Core-Insights data (repo must be cloned at the project root).
+# Don't let a pull failure kill the run: CI clones the repo fresh so the pull is redundant
+# there, and locally a dirty working tree in that mirror would otherwise abort the whole
+# pipeline. Warn and carry on with whatever data is already on disk.
 git_dir = "FPL-Core-Insights"
-g = git.cmd.Git(git_dir)
-g.pull()
+try:
+    git.cmd.Git(git_dir).pull()
+except Exception as exc:
+    print(f"WARNING — could not pull {git_dir} ({exc.__class__.__name__}); "
+          "continuing with the data already on disk. "
+          "If it looks stale, check for local modifications in that clone.")
 
 # %% [markdown]
-# ### FPL ELO GAMEWEEK STATS
+# ### ELO FIXTURE (TEAM) STATS  ->  FPL_DATA/elo_fixture_fact.csv
+#
+# Per-match team statistics, read from each gameweek's `fixtures.csv`.
+# The per-player table is built further down.
 
 # %%
+# FPL-Core-Insights only creates the season folder once it starts publishing. Exit cleanly
+# rather than raising a bare FileNotFoundError from inside a read_csv.
+if not os.path.isdir(ELO_DATA_DIR):
+    print(f"{ELO_DATA_DIR} does not exist yet — FPL-Core-Insights has not published "
+          f"{SEASON_FOLDER} data. Leaving existing FPL_DATA CSVs untouched.")
+    sys.exit(0)
+
 elo_players = pd.read_csv(f"{ELO_DATA_DIR}/players.csv")
 elo_teams = pd.read_csv(f"{ELO_DATA_DIR}/teams.csv")
+
+# Upstream uses the same club names as the FPL API ("Ipswich Town"), while team_dim's
+# canonical form is "Ipswich". An unresolved name yields a NaN team_id, and those rows are
+# then silently dropped — so normalise before any merge onto team_dim.
+elo_teams = normalise_team_names(
+    elo_teams, "name", team_dim["team"], label="FPL-Core-Insights teams.csv"
+)
+
 elo_path = f"{ELO_DATA_DIR}/By Tournament/Premier League/"
 
 
-elo_fixtures_25 = []
+elo_fixtures = []
 
 for gw in range(1, 39):
     gw_folder = os.path.join(elo_path, f"GW{gw}")
@@ -144,46 +158,58 @@ for gw in range(1, 39):
             # Convert to string, strip whitespace, lowercase, then compare
             df = df[df["finished"].astype(str).str.strip().str.lower() == "true"]
 
-        # Drop empty columns
-        df = df.dropna(axis=1, how='all')
+        # Drop empty columns — but only when rows survived the `finished` filter above.
+        # On a 0-row frame every column is trivially "all NaN", so this would drop the
+        # entire schema and the merges below would fail with KeyError.
+        if not df.empty:
+            df = df.dropna(axis=1, how='all')
 
-        elo_fixtures_25.append(df)
+        elo_fixtures.append(df)
     else:
         break
 
 
-elo_fixtures_25 = pd.concat(elo_fixtures_25, ignore_index=True)
+# Every GW folder now exists from the start of a season, so the loop above reads all 38 and
+# most yield zero finished fixtures early on. A 0-row frame still carries its columns, so the
+# merges below are safe; only a completely empty list would break pd.concat.
+if not elo_fixtures:
+    print(f"No gameweek folders found under {elo_path} — nothing to process.")
+    sys.exit(0)
+
+elo_fixtures = pd.concat(elo_fixtures, ignore_index=True)
+print(f"Finished fixtures found: {len(elo_fixtures)}")
 
 
 # %%
-# Map the home_team_id from fpl_elo_fixtures_25 and get the home_team_name from the elo_teams df
-elo_fixtures_25 = pd.merge(elo_fixtures_25, elo_teams[["code","name"]], how = "left", left_on="home_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"home_team_name"})
-# Map the away_team_id from fpl_elo_fixtures_25 and get the away_team_name from the elo_teams df
-elo_fixtures_25 = pd.merge(elo_fixtures_25, elo_teams[["code","name"]], how = "left", left_on="away_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"away_team_name"})
+# Resolve the home team: source team code -> team name (elo_teams) -> persistent team_id (team_dim)
+elo_fixtures = pd.merge(elo_fixtures, elo_teams[["code","name"]], how = "left", left_on="home_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"home_team_name"})
+# Same for the away team
+elo_fixtures = pd.merge(elo_fixtures, elo_teams[["code","name"]], how = "left", left_on="away_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"away_team_name"})
 
 #
-elo_fixtures_25 = pd.merge(elo_fixtures_25,team_dim,how = "left", left_on="home_team_name", right_on="team").drop(columns=["team"]).rename(columns={"team_id":"home_team_id"})
-elo_fixtures_25 = pd.merge(elo_fixtures_25,team_dim,how = "left", left_on="away_team_name", right_on="team").drop(columns=["team"]).rename(columns={"team_id":"away_team_id"})
+elo_fixtures = pd.merge(elo_fixtures,team_dim,how = "left", left_on="home_team_name", right_on="team").drop(columns=["team"]).rename(columns={"team_id":"home_team_id"})
+elo_fixtures = pd.merge(elo_fixtures,team_dim,how = "left", left_on="away_team_name", right_on="team").drop(columns=["team"]).rename(columns={"team_id":"away_team_id"})
 
 # %%
 # Match_id
-elo_fixtures_25["season"] = SEASON_SHORT
-elo_fixtures_25['match_id'] = (elo_fixtures_25['season'].str[:4] + elo_fixtures_25["home_team_id"].astype(str).str.zfill(2) + elo_fixtures_25['away_team_id'].astype(str).str.zfill(2)).astype('Int64')
+elo_fixtures["season"] = SEASON_SHORT
+elo_fixtures['match_id'] = (elo_fixtures['season'].str[:4] + elo_fixtures["home_team_id"].astype(str).str.zfill(2) + elo_fixtures['away_team_id'].astype(str).str.zfill(2)).astype('Int64')
 
 
 # gw_id
 # Convert match_id to string first, then extract the year
-elo_fixtures_25['gw_id'] = elo_fixtures_25['match_id'].astype(str).str[:4].astype(int) * 100 + elo_fixtures_25['GW'].astype(int)
+elo_fixtures['gw_id'] = elo_fixtures['match_id'].astype(str).str[:4].astype(int) * 100 + elo_fixtures['GW'].astype(int)
 
 # %%
-# Remove all columns where fpl_elo_fixtures has "pct" in its name
-elo_fixtures_25 = elo_fixtures_25[[col for col in elo_fixtures_25.columns if 'pct' not in col]]
-
-# Remove all columns where the NaN percentage is above 0.1
-elo_fixtures_25 = elo_fixtures_25.loc[:, (elo_fixtures_25.isna().sum() / len(elo_fixtures_25)) <= 0.1]
+# Pin the output schema. The previous ">10% NaN" filter made the column set data-dependent,
+# so the file silently changed width as the season filled in (93 -> 95 during 2025-26) and
+# broke consumers that assumed a fixed layout. It also divided by len(df), which is zero
+# before any match is played. Reindexing is deterministic: absent columns arrive as NaN.
+elo_fixtures = elo_fixtures.reindex(columns=ELO_FIXTURE_OUTPUT_COLS)
 
 # %%
-upsert_csv(elo_fixtures_25, "FPL_DATA/elo_fixture_fact.csv", keys=["match_id"])
+upsert_csv(elo_fixtures, "FPL_DATA/elo_fixture_fact.csv",
+           keys=["match_id"], columns=ELO_FIXTURE_OUTPUT_COLS)
 
 # %% [markdown]
 # ### ELO PLAYER GAMEWEEK STATS
@@ -191,7 +217,7 @@ upsert_csv(elo_fixtures_25, "FPL_DATA/elo_fixture_fact.csv", keys=["match_id"])
 # %%
 elo_path = f"{ELO_DATA_DIR}/By Tournament/Premier League/"
 
-elo_25 = []
+elo_player_match_stats = []
 
 for gw in range(1, 39):
     gw_folder = os.path.join(elo_path, f"GW{gw}")
@@ -211,60 +237,88 @@ for gw in range(1, 39):
             fixtures = fixtures[['match_id', 'home_team', 'away_team']]
             df = df.merge(fixtures, on='match_id', how='left')
         
-        df = df.dropna(axis=1, how='all')
-        elo_25.append(df)
+        # Same guard as the fixtures loop: a 0-row frame would lose every column here.
+        if not df.empty:
+            df = df.dropna(axis=1, how='all')
+        elo_player_match_stats.append(df)
     else:
         break
 
-elo_25 = pd.concat(elo_25, ignore_index=True)
+if not elo_player_match_stats:
+    print(f"No playermatchstats.csv files found under {elo_path}.")
+    sys.exit(0)
+
+elo_player_match_stats = pd.concat(elo_player_match_stats, ignore_index=True)
+
+# Before the season starts these files are header-only. With zero rows every column
+# trivially satisfies "all values == 0" and would be dropped below, after which the
+# explicit drop list raises KeyError. There is nothing to upsert either way.
+if elo_player_match_stats.empty:
+    print("No player match stats published yet — leaving elo_gameweek_fact.csv untouched.")
+    sys.exit(0)
+
+print(f"Player match stat rows found: {len(elo_player_match_stats)}")
 
 # %%
 # Dropping columns that have all columns = 0
 columns_to_drop = []
-for col in elo_25.columns:
-    if(elo_25[col] == 0).all():
+for col in elo_player_match_stats.columns:
+    if(elo_player_match_stats[col] == 0).all():
         columns_to_drop.append(col)
 # Drop them
-elo_25 = elo_25.drop(columns=columns_to_drop)
+elo_player_match_stats = elo_player_match_stats.drop(columns=columns_to_drop)
 
-# Drop columns i already have
-elo_25 = elo_25.drop(columns = ["minutes_played","goals","assists","xg","xa","penalties_missed","tackles","goals_conceded",])
+# Drop columns i already have. errors='ignore' because the all-zero pass above can legitimately
+# have removed some of these early in a season, and an upstream column may disappear entirely.
+elo_player_match_stats = elo_player_match_stats.drop(columns = ["minutes_played","goals","assists","xg","xa","penalties_missed","tackles","goals_conceded",], errors='ignore')
 
 elo_players["full_name"] = elo_players["first_name"] + " " + elo_players["second_name"]
 
 # %%
-elo_25 = pd.merge(elo_25, elo_players[["player_id","full_name"]], how = "left", on="player_id").drop(columns=["player_id"])
-elo_25 = pd.merge(elo_25, elo_teams[["code","name"]], how = "left", left_on="home_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"home_team_name"})
-elo_25 = pd.merge(elo_25, elo_teams[["code","name"]], how = "left", left_on="away_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"away_team_name"})
-elo_25 = pd.merge(elo_25, team_dim, how = "left", left_on="home_team_name", right_on="team").drop(columns = ["team"]).rename(columns = {"team_id":"home_team_id"})
-elo_25 = pd.merge(elo_25, team_dim, how = "left", left_on="away_team_name", right_on="team").drop(columns = ["team"]).rename(columns = {"team_id":"away_team_id"})
+elo_player_match_stats = pd.merge(elo_player_match_stats, elo_players[["player_id","full_name"]], how = "left", on="player_id").drop(columns=["player_id"])
+elo_player_match_stats = pd.merge(elo_player_match_stats, elo_teams[["code","name"]], how = "left", left_on="home_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"home_team_name"})
+elo_player_match_stats = pd.merge(elo_player_match_stats, elo_teams[["code","name"]], how = "left", left_on="away_team",right_on="code").drop(columns = ["code"]).rename(columns={"name":"away_team_name"})
+elo_player_match_stats = pd.merge(elo_player_match_stats, team_dim, how = "left", left_on="home_team_name", right_on="team").drop(columns = ["team"]).rename(columns = {"team_id":"home_team_id"})
+elo_player_match_stats = pd.merge(elo_player_match_stats, team_dim, how = "left", left_on="away_team_name", right_on="team").drop(columns = ["team"]).rename(columns = {"team_id":"away_team_id"})
 
 # %%
-elo_25["season"] = SEASON_SHORT
-elo_25['match_id'] = (elo_25['season'].str[:4] + elo_25["home_team_id"].astype(str).str.zfill(2) + elo_25['away_team_id'].astype(str).str.zfill(2)).astype('Int64')
+elo_player_match_stats["season"] = SEASON_SHORT
+elo_player_match_stats['match_id'] = (elo_player_match_stats['season'].str[:4] + elo_player_match_stats["home_team_id"].astype(str).str.zfill(2) + elo_player_match_stats['away_team_id'].astype(str).str.zfill(2)).astype('Int64')
 
 # %%
-# Getting the player id from the player dim table
-elo_25 = pd.merge(elo_25, 
-                      player_dim[["player_id","full_name"]], 
-                      how = "left", 
-                      left_on="full_name",
-                      right_on= "full_name")
+# Getting the player id from the player dim table.
+# Join on a folded key rather than the raw name: FPL-Core-Insights and player_dim spell the
+# same player differently, and the FPL API periodically rewrites its own spelling (2026-27
+# dropped the accents from "Aarón Anselmino" and shortened several Portuguese names), which
+# silently produced NaN player_ids. See PLAYER_ALIASES in common.py.
+_pdim = player_dim[["player_id", "full_name"]].copy()
+_pdim["_name_key"] = player_name_key(_pdim["full_name"])
+_pdim = _pdim.drop(columns=["full_name"])
+
+elo_player_match_stats["_name_key"] = player_name_key(elo_player_match_stats["full_name"])
+elo_player_match_stats = pd.merge(elo_player_match_stats, _pdim, how="left", on="_name_key")
+
+_missing = elo_player_match_stats.loc[elo_player_match_stats["player_id"].isna(), "full_name"].dropna().unique()
+if len(_missing):
+    print(f"WARNING — {len(_missing)} player name(s) did not match player_dim: "
+          f"{sorted(_missing)[:10]}. Add them to PLAYER_ALIASES in common.py.")
+
+elo_player_match_stats = elo_player_match_stats.drop(columns=["_name_key"])
 
 # getting team positi id
-elo_25 = pd.merge(elo_25,
+elo_player_match_stats = pd.merge(elo_player_match_stats,
                       elo_players[["full_name","team_code","position"]],
                       how = "left",
                       on = "full_name")
 
 # Getting team id
-elo_25 = pd.merge(elo_25,
+elo_player_match_stats = pd.merge(elo_player_match_stats,
                       elo_teams[["code","name"]],
                       how = "left",
                       left_on= "team_code",
                       right_on="code").drop(columns=["team_code","code"])
 
-elo_25 = pd.merge(elo_25,
+elo_player_match_stats = pd.merge(elo_player_match_stats,
                       team_dim,
                       how = "left",
                       left_on= "name",
@@ -277,22 +331,25 @@ POS_FULL_TO_ABBR = {
     "Midfielder": "MID",
     "Forward":    "FWD",
 }
-elo_25["position"] = elo_25["position"].map(POS_FULL_TO_ABBR)
+elo_player_match_stats["position"] = elo_player_match_stats["position"].map(POS_FULL_TO_ABBR)
 
-elo_25 = pd.merge(elo_25,
+elo_player_match_stats = pd.merge(elo_player_match_stats,
                       position_dim,
                       how = "left",
                       left_on= "position",
                       right_on="position").drop(columns=["position"])
 
 # %%
-elo_25['gw_id'] = elo_25['match_id'].astype(str).str[:4].astype(int) * 100 + elo_25['GW'].astype(int)
+elo_player_match_stats['gw_id'] = elo_player_match_stats['match_id'].astype(str).str[:4].astype(int) * 100 + elo_player_match_stats['GW'].astype(int)
 
 # generating a was_home binary column
-elo_25["was_home"] = (elo_25["team_id"] == elo_25["home_team_id"]).astype(int)
+elo_player_match_stats["was_home"] = (elo_player_match_stats["team_id"] == elo_player_match_stats["home_team_id"]).astype(int)
 
 # %%
-elo_25 = elo_25[ELO_PLAYER_COLS]
+# reindex rather than strict selection: the all-zero pass above legitimately removes columns
+# early in a season, and [ELO_PLAYER_COLS] would then raise KeyError. Missing ones become NaN.
+elo_player_match_stats = elo_player_match_stats.reindex(columns=ELO_PLAYER_COLS)
 
 # %%
-upsert_csv(elo_25, "FPL_DATA/elo_gameweek_fact.csv", keys=["match_id", "player_id"])
+upsert_csv(elo_player_match_stats, "FPL_DATA/elo_gameweek_fact.csv",
+           keys=["match_id", "player_id"], columns=ELO_PLAYER_COLS)

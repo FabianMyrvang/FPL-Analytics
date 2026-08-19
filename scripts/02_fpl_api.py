@@ -15,9 +15,14 @@
 # %%
 # --- repo-root bootstrap: resolve paths relative to the project root ---
 # Lets this code find "seed_data/", "FPL_DATA/", "FPL-Core-Insights/" etc. whether it is
-# run from notebooks/, scripts/, or the repo root.
+# run from notebooks/, scripts/, or the repo root. We chdir away from scripts/, so put it
+# on sys.path explicitly to keep `import common` working from either location.
 import os
+import sys
 from pathlib import Path
+_SCRIPTS_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 if Path.cwd().name in ("notebooks", "scripts"):
     os.chdir(Path.cwd().parent)
 
@@ -78,12 +83,10 @@ FPL_GAMEWEEK_COLS = ['match_id','gw_id', 'player_id', 'team_id', 'position_id', 
 
 
 # %%
-def get_current_season(today=None):
-    """Return current football season as 'YYYY-YY' (e.g. '2025-26').
-    The season runs Aug–May, so month >= 8 starts a new season."""
-    d = today or datetime.now()
-    start = d.year if d.month >= 8 else d.year - 1
-    return f"{start}-{str(start + 1)[-2:]}"
+from common import get_current_season, normalise_team_names
+
+SEASON_SHORT, _ = get_current_season()
+print(f"Season: {SEASON_SHORT}")
 
 
 # %%
@@ -110,10 +113,19 @@ fpl_api_players = pd.DataFrame(bootstrap['elements'])[
 # Add full_name to fpl_api_players
 fpl_api_players["full_name"] = fpl_api_players["first_name"] + " " + fpl_api_players["second_name"]
 
+# The FPL API occasionally renames a club mid-life (2026-27: "Ipswich" -> "Ipswich Town").
+# Matching on the raw name would treat the rename as a debutant, mint a fresh team_id and
+# orphan every prior season of that club's history. Normalise onto the canonical form
+# already stored in team_dim, at source, so every downstream name->id lookup agrees —
+# map_team_ids silently DROPS rows whose team name it cannot resolve.
+# TEAM_ALIASES lives in scripts/common.py, shared with 03_fpl_elo_player.py.
+
 # DIM: Teams (include code for kit image URLs)
 fpl_api_teams = pd.DataFrame(bootstrap['teams'])[
     ['id', 'code', 'name']
 ].rename(columns={'id': 'team_id', 'name': 'team'})
+
+fpl_api_teams = normalise_team_names(fpl_api_teams, 'team')
 
 # Merge team kit code into players so creating_player_ids can build kit URLs
 fpl_api_players = fpl_api_players.merge(
@@ -159,6 +171,19 @@ for gw in finished_gws:
     sleep(2)  # avoid hammering the API
 
 gws_df = pd.DataFrame(gws)
+
+# Pre-season / between seasons there are no finished gameweeks, so `gws` is empty and
+# pd.DataFrame([]) has no columns at all — the merges below would raise KeyError.
+# Seed the merge keys with real dtypes (an untyped empty frame gives object columns,
+# which pandas refuses to merge against int64) so the player-stats path folds through
+# as a no-op upsert and the dims/fixtures still refresh.
+has_finished_gws = not gws_df.empty
+if not has_finished_gws:
+    print("No finished gameweeks yet — skipping player gameweek stats this run.")
+    gws_df = pd.DataFrame({
+        'player_id': pd.Series(dtype='int64'),
+        'gw':        pd.Series(dtype='int64'),
+    })
 
 # %%
 # --- 4. Create Master Player Stats Table ---
@@ -224,11 +249,14 @@ master_fixtures_table = (
 )
 
 # Result
+# Test for nulls FIRST: when no fixture has been played yet the score columns stay
+# object-typed and hold real Nones, and `None > None` raises. Once any fixture has a
+# score pandas types the column float64 and unplayed fixtures read as NaN instead.
 master_fixtures_table['result'] = master_fixtures_table.apply(
-    lambda row: 'H' if row['home_score'] > row['away_score']
+    lambda row: None if pd.isna(row['home_score']) or pd.isna(row['away_score'])
+                else 'H' if row['home_score'] > row['away_score']
                 else 'D' if row['home_score'] == row['away_score']
-                else 'A' if pd.notna(row['home_score']) and pd.notna(row['away_score'])
-                else None,
+                else 'A',
     axis=1
 )
 
@@ -344,7 +372,7 @@ def map_player_ids(stats_table, players_dim):
 
 # %%
 def team_merge(new_teams : pd.DataFrame, old_teams : pd.DataFrame):
-    
+
     new_teams = new_teams.copy()
 
     new_teams['team_id'] = new_teams['team'].map(dict(zip(old_teams['team'], old_teams['team_id'])))
@@ -360,6 +388,10 @@ def team_merge(new_teams : pd.DataFrame, old_teams : pd.DataFrame):
         max_id + 1,
         max_id + 1 + new_teams_mask.sum()
     )
+
+    if new_teams_mask.any():
+        print(f"Assigning new team_ids to: {new_teams.loc[new_teams_mask, 'team'].tolist()} "
+              "— confirm these are genuine debutants, not renames (else add to TEAM_ALIASES).")
     
     # Concatenating the Vastav teams data to fpl api 25 season
     all_teams = pd.concat([
@@ -385,7 +417,7 @@ def map_team_ids(master_df: pd.DataFrame, all_teams: pd.DataFrame):
     master_df = master_df.copy()
     all_teams = all_teams.copy()
 
-    master_df["season"] = get_current_season()
+    master_df["season"] = SEASON_SHORT
 
     # Mapping dictionary
     team_map = dict(zip(all_teams["team"], all_teams["team_id"]))
@@ -536,7 +568,13 @@ master_fixtures_table = map_team_ids(master_fixtures_table, team_dim)
 # TIME-SERIES FACT TABLES — upsert into existing output to preserve prior seasons.
 # Fresh current-season rows win on key collision (keep='last'); this also subsumes
 # the double-GW deduplication on (gw_id, player_id).
-fpl_gameweek_fact = upsert_stats(master_player_stats_table, "FPL_DATA/fpl_gameweek_fact.csv", fpl20_24,            FPL_GAMEWEEK_COLS,   ['gw_id', 'player_id'])
+# With no finished gameweeks there is nothing to upsert. Skip it rather than folding an
+# empty frame in: concatenating against the saved CSV would upcast every int64 column to
+# float64 and rewrite all 16 MB with 0 -> 0.0 for no gain.
+fpl_gameweek_fact = (
+    upsert_stats(master_player_stats_table, "FPL_DATA/fpl_gameweek_fact.csv", fpl20_24,            FPL_GAMEWEEK_COLS,   ['gw_id', 'player_id'])
+    if has_finished_gws else None
+)
 fixture_dim     = upsert_stats(master_fixtures_table,     "FPL_DATA/fixture_dim.csv",     fixtures_df,         FIXTURES_COLS,       ['match_id'])
 season_dim      = upsert_stats(master_fixtures_table,     "FPL_DATA/season_dim.csv",      fixtures_df,         SEASON_COLS,         ['gw_id']).dropna(subset=['gw_id']).reset_index(drop=True)
 fpl_fixture_fact  = upsert_stats(master_fixtures_table,     "FPL_DATA/fpl_fixture_fact.csv",  fixtures_stats20_24, FIXTURES_STATS_COLS, ['match_id'])
@@ -550,4 +588,7 @@ fixture_dim.to_csv("FPL_DATA/fixture_dim.csv", index=False)
 season_dim.to_csv("FPL_DATA/season_dim.csv", index=False)
 
 fpl_fixture_fact.to_csv("FPL_DATA/fpl_fixture_fact.csv",index= False)
-fpl_gameweek_fact.to_csv("FPL_DATA/fpl_gameweek_fact.csv", index=False)
+if fpl_gameweek_fact is not None:
+    fpl_gameweek_fact.to_csv("FPL_DATA/fpl_gameweek_fact.csv", index=False)
+else:
+    print("Left FPL_DATA/fpl_gameweek_fact.csv untouched (no new gameweek data).")

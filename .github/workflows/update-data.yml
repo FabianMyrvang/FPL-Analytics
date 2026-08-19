@@ -4,7 +4,7 @@ on:
   workflow_dispatch:        # manual "Run workflow" button — runs regardless of season
   schedule:
     # Daily at 06:00 UTC. The season-guard step skips the off-season, so the
-    # schedule effectively wakes up on its own each 20 August.
+    # schedule effectively wakes up on its own each 25 August.
     - cron: "0 6 * * *"
 
 permissions:
@@ -28,11 +28,12 @@ jobs:
             echo "Manual run — proceeding regardless of season."
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            # Off-season runs June, July and the first 19 days of August; the new
-            # season's data is only worth refreshing from 20 August onwards.
+            # Off-season runs June, July and the first 24 days of August. The season
+            # opens around 21 August, but GW1 results aren't final until a few days
+            # later, so there is nothing worth refreshing before 25 August.
             m=$(date -u +%m)
             d=$(date -u +%-d)
-            if [ "$m" = "06" ] || [ "$m" = "07" ] || { [ "$m" = "08" ] && [ "$d" -lt 20 ]; }; then
+            if [ "$m" = "06" ] || [ "$m" = "07" ] || { [ "$m" = "08" ] && [ "$d" -lt 25 ]; }; then
               echo "Off-season (month $m, day $d) — skipping scheduled run."
               echo "run=false" >> "$GITHUB_OUTPUT"
             else
