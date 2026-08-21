@@ -592,3 +592,98 @@ if fpl_gameweek_fact is not None:
     fpl_gameweek_fact.to_csv("FPL_DATA/fpl_gameweek_fact.csv", index=False)
 else:
     print("Left FPL_DATA/fpl_gameweek_fact.csv untouched (no new gameweek data).")
+
+# %%
+# --- NEXT 5 FIXTURES (per player) ---
+# Feeds the dashboard's fixture-difficulty chips: for each current-season player, their
+# club's next five fixtures as an opponent short code (UPPER = home, lower = away) plus
+# FPL's 1-5 difficulty rating.
+#
+# Deliberately a SNAPSHOT, not an upsert — "the next five" moves as the season advances,
+# so the file is rebuilt in full every run. Short codes live here rather than in team_dim,
+# and the player->club link here rather than in player_dim, so the existing dimension
+# schemas stay untouched (their Power BI queries pin exact column counts).
+
+NEXT_N = 5
+
+# short_name (BOU, MCI) is only published in the bootstrap, never stored in team_dim.
+api_team_short = {t['id']: t['short_name'] for t in bootstrap['teams']}
+
+# The API renumbers its team ids every season; team_dim ids are persistent. Bridge the two
+# via the normalised club name.
+_team_name_to_id = dict(zip(team_dim['team'], team_dim['team_id']))
+api_team_to_persistent = {
+    row.team_id: _team_name_to_id.get(row.team) for row in fpl_api_teams.itertuples()
+}
+persistent_to_short = {
+    pid: api_team_short[api_id]
+    for api_id, pid in api_team_to_persistent.items()
+    if pid is not None and api_id in api_team_short
+}
+
+upcoming = master_fixtures_table.copy()
+upcoming["kickoff_time"] = pd.to_datetime(upcoming["kickoff_time"], utc=True, errors="coerce")
+upcoming = upcoming[upcoming["kickoff_time"] >= pd.Timestamp.now(tz="UTC")]
+
+if upcoming.empty:
+    print("No upcoming fixtures — skipping FPL_DATA/player_next_fixtures.csv.")
+else:
+    # A fixture names two clubs, so unpivot to one row per team before "this team's next
+    # match" becomes a simple sort.
+    _home = upcoming.assign(
+        team_id=upcoming["home_team_id"], opponent_id=upcoming["away_team_id"],
+        is_home=True, difficulty=upcoming["team_h_difficulty"],
+    )
+    _away = upcoming.assign(
+        team_id=upcoming["away_team_id"], opponent_id=upcoming["home_team_id"],
+        is_home=False, difficulty=upcoming["team_a_difficulty"],
+    )
+    team_fixtures = pd.concat([_home, _away], ignore_index=True)[
+        ["team_id", "opponent_id", "is_home", "difficulty", "kickoff_time"]
+    ].dropna(subset=["team_id", "opponent_id"])
+
+    # Chronological order handles double and blank gameweeks with no special-casing.
+    team_fixtures = team_fixtures.sort_values(["team_id", "kickoff_time"])
+    team_fixtures["slot"] = team_fixtures.groupby("team_id").cumcount() + 1
+    team_fixtures = team_fixtures[team_fixtures["slot"] <= NEXT_N]
+
+    # Case carries the venue, matching the convention used by public FPL fixture tickers.
+    team_fixtures["opp"] = [
+        (code.upper() if home else code.lower()) if isinstance(code, str) else None
+        for code, home in zip(
+            team_fixtures["opponent_id"].map(persistent_to_short), team_fixtures["is_home"]
+        )
+    ]
+
+    wide = team_fixtures.pivot(index="team_id", columns="slot", values=["opp", "difficulty"])
+    wide.columns = [
+        f"next_{slot}_{'opp' if kind == 'opp' else 'diff'}" for kind, slot in wide.columns
+    ]
+    wide = wide.reindex(
+        columns=[f"next_{i}_{k}" for i in range(1, NEXT_N + 1) for k in ("opp", "diff")]
+    ).reset_index()
+
+    players = fpl_api_players[["full_name", "team_id"]].copy()
+    players["team_id"] = players["team_id"].map(api_team_to_persistent)
+    players = players.merge(player_dim[["player_id", "full_name"]], on="full_name", how="left")
+
+    _unmatched = int(players["player_id"].isna().sum())
+    if _unmatched:
+        print(f"WARNING — {_unmatched} current player(s) did not match player_dim; "
+              "they will have no fixture chips.")
+
+    player_next_fixtures = (
+        players.dropna(subset=["player_id", "team_id"])
+        .merge(wide, on="team_id", how="left")
+        .drop(columns=["full_name", "team_id"])
+        .astype({"player_id": int})
+        .sort_values("player_id")
+    )
+    for _i in range(1, NEXT_N + 1):
+        player_next_fixtures[f"next_{_i}_diff"] = (
+            player_next_fixtures[f"next_{_i}_diff"].astype("Int64")
+        )
+
+    player_next_fixtures.to_csv("FPL_DATA/player_next_fixtures.csv", index=False)
+    print(f"Wrote FPL_DATA/player_next_fixtures.csv "
+          f"({len(player_next_fixtures)} players, next {NEXT_N} fixtures each)")
