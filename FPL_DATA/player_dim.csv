@@ -161,7 +161,6 @@ player_id,full_name,web_name,player_name,photo_url
 249,Cameron Archer,Archer,Archer,
 250,Cameron Burgess,Burgess,Burgess,
 251,Cameron Carter Vickers,Carter-Vickers,Carter-Vickers,
-252,Cameron Humphreys,Humphreys,C. Humphreys,
 253,Cameron Peupion,Peupion,Peupion,
 254,Cameron Plain,Plain,Plain,
 260,Carlos Mendes Gomes,Mendes,Mendes,
@@ -235,7 +234,6 @@ player_id,full_name,web_name,player_name,photo_url
 357,Daniel Chesters,Chesters,Chesters,
 358,Daniel Gore,Gore,Gore,
 359,Daniel Iversen,Iversen,Iversen,
-361,Daniel Jebbison,Jebbison,Jebbison,
 362,Daniel Langley,Langley,Langley,
 364,Daniel N'Lundulu,N'Lundulu,N'Lundulu,
 365,Danilo dos Santos de Oliveira,Danilo,Danilo,
@@ -654,7 +652,6 @@ player_id,full_name,web_name,player_name,photo_url
 1026,Louis Jackson,Jackson,L. Jackson,
 1027,Loïc Badé,Badé,Badé,
 1028,Loïc Mbe Soh,Mbe Soh,Mbe Soh,
-1029,Luc De Fougerolles,De Fougerolles,De Fougerolles,
 1030,Luca Barrington,Barrington,Barrington,
 1032,Luca Williams Barnett,Barnett,L. Barnett,
 1033,Lucas Bergström,Bergström,Bergström,
@@ -1162,7 +1159,6 @@ player_id,full_name,web_name,player_name,photo_url
 700,Jadon Sancho,Sancho,Sancho,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 738,James Wright,Wright,J. Wright,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 433,Douglas Luiz Soares de Paulo,Douglas Luiz,Douglas Luiz,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
-1768,Triston Rowe,Rowe,T. Rowe,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 1483,Sam Proctor,Proctor,Proctor,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 1647,Travis Patterson,Patterson,T. Patterson,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 1771,Ronnie Hollingshead,Hollingshead,Hollingshead,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
@@ -1261,7 +1257,6 @@ player_id,full_name,web_name,player_name,photo_url
 1821,Abdallah Sima,Sima,Sima,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 728,James Milner,Milner,Milner,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 781,Jeremy Sarmiento Morante,Sarmiento,Sarmiento,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
-1823,Malick Yalcouyé,Yalcouye,Yalcouye,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 802,Joe Knight,Knight,J. Knight,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 32,Adrian Mazilu,Mazilu,Mazilu,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 96,Andrew Moran,Moran,Moran,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
@@ -1321,9 +1316,7 @@ player_id,full_name,web_name,player_name,photo_url
 1351,Patrick Bamford,Bamford,Bamford,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 1878,Harry Gray,Gray,H. Gray,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 1879,Sam Chambers,Chambers,S. Chambers,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
-1880,Jayden Lienou,Lienou,Lienou,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 1881,Rhys Chadwick,Chadwick,Chadwick,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
-1882,Alfie Cresswell,Cresswell,A. Cresswell,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 1884,Ármin Pécsi,Pécsi,Pécsi,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_14-110.png
 640,Ibrahima Konaté,Konaté,Konaté,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_14-110.png
 966,Konstantinos Tsimikas,Tsimikas,K. Tsimikas,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_14-110.png
@@ -1375,7 +1368,6 @@ player_id,full_name,web_name,player_name,photo_url
 7,Aaron Ramsdale,Ramsdale,Ramsdale,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
 1915,Seung-Soo Park,Seung soo,Seung soo,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
 824,John Ruddy,Ruddy,Ruddy,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
-1917,Leo Shahar,Shahar,Shahar,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
 1918,Sam Alabi,Alabi,Alabi,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
 1308,Oleksandr Zinchenko,Zinchenko,Zinchenko,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_17-110.png
 1553,Stefan Ortega Moreno,Ortega Moreno,Ortega Moreno,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_17-110.png
@@ -1432,7 +1424,6 @@ player_id,full_name,web_name,player_name,photo_url
 884,João Maria Lobo Alves Palhares Costa Palhinha Gonçalves,J.Palhinha,J.Palhinha,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 1982,Randal Kolo Muani,Kolo Muani,Kolo Muani,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 1985,Yusuf Akhamrich,Akhamrich,Akhamrich,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
-1986,Lucá Williams-Barnett,Williams-Barnett,Williams-Barnett,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 1988,Rio Kyerematen,Kyerematen,Kyerematen,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 1989,James Wilson,Wilson,J. Wilson,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 25,Adama Traoré Diarra,Adama,Adama,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_21-110.png
@@ -1576,6 +1567,8 @@ player_id,full_name,web_name,player_name,photo_url
 2019,Brian Madjo,Madjo,Madjo,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 2116,Matteo Ruggeri,Ruggeri,Ruggeri,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 2117,Zion Suzuki,Suzuki,Suzuki,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
+1768,Triston Rowe,Rowe,T. Rowe,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
+2120,Luka Lynch,Lynch,Lynch,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_7-110.png
 1755,Đorđe Petrović,Petrović,Petrović,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_91-110.png
 540,Fraser Forster,Forster,Forster,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_91-110.png
 1700,Will Dennis,Dennis,W. Dennis,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_91-110.png
@@ -1603,6 +1596,7 @@ player_id,full_name,web_name,player_name,photo_url
 2020,Álvaro Rodríguez,Rodríguez,Á. Rodríguez,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_91-110.png
 2021,António João Pereira de Albuquerque Tavares da Silva,Silva,A. Silva,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_91-110.png
 2022,Juanlu Sánchez,Sanchez,Sanchez,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_91-110.png
+361,Daniel Jebbison,Jebbison,Jebbison,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_91-110.png
 255,Caoimhín Kelleher,Kelleher,Kelleher,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_94-110.png
 632,Hákon Rafn Valdimarsson,Valdimarsson,Valdimarsson,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_94-110.png
 1256,Nathan Collins,Collins,Collins,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_94-110.png
@@ -1661,6 +1655,7 @@ player_id,full_name,web_name,player_name,photo_url
 1978,Luka Vušković,Vuskovic,Vuskovic,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 2028,Promise David,David,David,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 637,Ibrahim Osman,Osman,Osman,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
+1823,Malick Yalcouyé,Yalcouyé,Yalcouyé,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_36-110.png
 1236,Morgan Rogers,Rogers,Rogers,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_8-110.png
 840,Jordan Henderson,Henderson,J. Henderson,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_8-110.png
 369,Danny Welbeck,Welbeck,Welbeck,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_8-110.png
@@ -1811,6 +1806,7 @@ player_id,full_name,web_name,player_name,photo_url
 2061,Gonzalo García,Gonzalo,Gonzalo,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_54-110.png
 2062,César Palacios,Palacios,Palacios,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_54-110.png
 1531,Shea Charles,Charles,Charles,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_54-110.png
+1029,Luc De Fougerolles,De Fougerolles,De Fougerolles,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_54-110.png
 2063,Dillon Phillips,Phillips,D. Phillips,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_88-110.png
 668,Jack Butland,Butland,Butland,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_88-110.png
 2064,Harvey Cartwright,Cartwright,H. Cartwright,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_88-110.png
@@ -1880,6 +1876,7 @@ player_id,full_name,web_name,player_name,photo_url
 1789,Florentino Ibrain Morris Luís,Florentino,Florentino,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_40-110.png
 895,Julio Enciso,Enciso,Enciso,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_40-110.png
 2098,Abdoul Ouattara,Ouattara,Ouattara,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_40-110.png
+252,Cameron Humphreys,Humphreys,C. Humphreys,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_40-110.png
 614,Harry Wilson,Wilson,H. Wilson,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 1876,Lucas Estella Perri,Perri,Perri,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 1864,Jaka Bijol,Bijol,Bijol,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
@@ -1905,6 +1902,8 @@ player_id,full_name,web_name,player_name,photo_url
 1873,Mateo Joseph Fernández-Regatillo,Mateo Joseph,M. Fernández-Regatillo,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 736,James Trafford,Trafford,Trafford,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 2119,Nico Elvedi,Elvedi,Elvedi,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
+1880,Jayden Lienou,Lienou,Lienou,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
+1882,Alfie Cresswell,Cresswell,A. Cresswell,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_2-110.png
 75,Alisson Becker,A.Becker,A.Becker,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_14-110.png
 1883,Giorgi Mamardashvili,Mamardashvili,Mamardashvili,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_14-110.png
 544,Freddie Woodman,Woodman,Woodman,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_14-110.png
@@ -2029,6 +2028,7 @@ player_id,full_name,web_name,player_name,photo_url
 2109,Aladji Bamba,Bamba,Bamba,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
 2110,Lukás Hornícek,Horníček,Horníček,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
 2111,Amar Dedic,Dedić,Dedić,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
+1917,Leo Shahar,Shahar,Shahar,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_4-110.png
 1176,Matz Sels,Sels,Sels,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_17-110.png
 1925,John Victor Maciel Furtado,John,J. Furtado,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_17-110.png
 1270,Neco Williams,N.Williams,N.Williams,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_17-110.png
@@ -2093,6 +2093,7 @@ player_id,full_name,web_name,player_name,photo_url
 1980,Dominic Solanke-Mitchell,Solanke,Solanke,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 1414,Richarlison de Andrade,Richarlison,Richarlison,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 349,Dane Scarlett,Scarlett,Scarlett,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
+1986,Luca Williams-Barnett,Williams-Barnett,Williams-Barnett,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_6-110.png
 1965,Robin Roefs,Roefs,Roefs,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_56-110.png
 1934,Anthony Patterson,Patterson,A. Patterson,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_56-110.png
 1973,Melker Ellborg,Ellborg,Ellborg,https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_56-110.png
