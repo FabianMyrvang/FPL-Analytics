@@ -17,8 +17,20 @@ automatically as the data updates:
 
 - **FPL API** — player info, gameweek scores, prices, transfers, fixtures
 - **FPL-Core-Insights** (by [olbauday](https://github.com/olbauday/FPL-Core-Insights)) — detailed per-match player & team stats
-- **FBref** — supplementary match stats
-- **Fantasy-Premier-League archive** (by [vaastav](https://github.com/vaastav/Fantasy-Premier-League)) — historical seasons (2020–25)
+- **Fantasy-Premier-League archive** (by [vaastav](https://github.com/vaastav/Fantasy-Premier-League)) — historical seasons (2020–25), used to seed the first run
+
+An experimental FBref scraper also exists (`scripts/04_fpl_elo_player_backup_scraper.py`) as a
+fallback for when the FPL-Core-Insights data degrades mid-season. It is not part of the automated
+pipeline, and none of the published datasets currently come from it.
+
+## Updates
+
+The datasets refresh themselves via a [GitHub Action](.github/workflows/update-data.yml):
+
+- **Daily at 06:00 UTC** during the season (GitHub's scheduler often runs it 30–60 minutes late)
+- **Paused over the off-season** — June, July and the first 24 days of August — resuming
+  automatically each 25 August, once the new season's opening gameweek is complete
+- A run only commits when the data actually changed, so quiet periods produce no commits
 
 ## Output
 
@@ -42,6 +54,16 @@ The datasets live in [`FPL_DATA/`](FPL_DATA/) as CSVs and can be used directly.
 | `position_dim.csv` | Position ID mapping (GK / DEF / MID / FWD)   |
 | `fixture_dim.csv`  | Historical fixture list with persistent IDs  |
 | `season_dim.csv`   | Season ID mapping                            |
+
+**Helper tables**
+
+| File                        | Contents                                                                     |
+| --------------------------- | ---------------------------------------------------------------------------- |
+| `player_next_fixtures.csv`  | Each current-season player's next five fixtures: opponent short code and FPL difficulty (1–5) |
+
+`player_next_fixtures.csv` is a **snapshot**, rebuilt in full on every run rather than accumulated,
+because "the next five" moves as the season advances. Opponent codes use case to show venue —
+`BOU` is home, `bou` is away.
 
 ## Credits
 
