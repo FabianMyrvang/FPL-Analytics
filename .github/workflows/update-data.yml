@@ -75,6 +75,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No data changes to commit."
           else
-            git commit -m "chore: update FPL data ($(date -u +%Y-%m-%d))"
+            git commit -m "Update FPL data ($(date -u +%Y-%m-%d))"
             git push
           fi
