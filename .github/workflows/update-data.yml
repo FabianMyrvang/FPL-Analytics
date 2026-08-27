@@ -3,9 +3,15 @@ name: Update FPL data
 on:
   workflow_dispatch:        # manual "Run workflow" button — runs regardless of season
   schedule:
-    # Daily at 06:00 UTC. The season-guard step skips the off-season, so the
-    # schedule effectively wakes up on its own each 25 August.
-    - cron: "0 6 * * *"
+    # Daily at 05:23 UTC. GitHub's scheduler is best-effort and consistently adds 35-55
+    # minutes of drift, so this lands around 06:00-06:20 UTC — an hour before the Power BI
+    # refresh at 09:00 Oslo (07:00 UTC in summer). :23 avoids :00/:15/:30/:45, the most
+    # contended slots. Runs can still be delayed by hours or dropped entirely; the second
+    # Power BI refresh at 18:00 Oslo is what covers that.
+    #
+    # The season-guard step skips the off-season, so the schedule wakes up on its own each
+    # 25 August.
+    - cron: "23 5 * * *"
 
 permissions:
   contents: write           # allow the bot to commit refreshed data back to the repo
