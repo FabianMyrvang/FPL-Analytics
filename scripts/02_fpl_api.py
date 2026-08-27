@@ -78,8 +78,15 @@ FPL_GAMEWEEK_COLS = ['match_id','gw_id', 'player_id', 'team_id', 'position_id', 
        'penalties_saved', 'red_cards', 'saves', 'threat', 'total_points',
        'transfers_in', 'transfers_out', 'now_cost', 'yellow_cards',
        'expected_assists', 'expected_goal_involvements', 'expected_goals',
-       'expected_goals_conceded', 'starts','clearances_blocks_interceptions', 
-       'recoveries', 'tackles','defensive_contribution']
+       'expected_goals_conceded', 'starts','clearances_blocks_interceptions',
+       'recoveries', 'tackles','defensive_contribution', 'selected_by_percent']
+
+# Snapshot fields: the API reports only their CURRENT value, but they are merged onto every
+# gameweek row. Refreshing them would stamp today's figure across all 38 weeks — which is exactly
+# why 2025-26's price and transfer history was flat before the backfill. Freeze them on first
+# write so each gameweek keeps what it had when it was captured. Everything else keeps refreshing,
+# since bonus points and stat corrections land days after a match.
+FROZEN_SNAPSHOT_COLS = ['selected_by_percent', 'now_cost', 'transfers_in', 'transfers_out']
 
 
 # %%
@@ -112,6 +119,11 @@ fpl_api_players = pd.DataFrame(bootstrap['elements'])[
 
 # Add full_name to fpl_api_players
 fpl_api_players["full_name"] = fpl_api_players["first_name"] + " " + fpl_api_players["second_name"]
+
+# The API returns ownership as a string ('68.2'); store it as a number so it aggregates.
+fpl_api_players["selected_by_percent"] = pd.to_numeric(
+    fpl_api_players["selected_by_percent"], errors="coerce"
+)
 
 # The FPL API occasionally renames a club mid-life (2026-27: "Ipswich" -> "Ipswich Town").
 # Matching on the raw name would treat the rename as a debutant, mint a fresh team_id and
@@ -466,7 +478,7 @@ def concat_gameweek_stats(master_gw_df, prev_seasons_gw, columns):
     return fpl_gw_complete
 
 
-def upsert_stats(master_df, output_path, historical_df, columns, key_cols):
+def upsert_stats(master_df, output_path, historical_df, columns, key_cols, freeze_cols=None):
     """Upsert fresh current-season rows into the existing output CSV.
 
     The existing CSV (all prior seasons) is the base; the freshly fetched
@@ -478,6 +490,17 @@ def upsert_stats(master_df, output_path, historical_df, columns, key_cols):
     """
     current = master_df.copy()
     base = pd.read_csv(output_path) if os.path.exists(output_path) else historical_df.copy()
+
+    if freeze_cols and os.path.exists(output_path):
+        keep = [c for c in freeze_cols if c in base.columns and c in current.columns]
+        if keep:
+            prior = base[key_cols + keep].drop_duplicates(subset=key_cols, keep="last")
+            current = current.merge(prior, on=key_cols, how="left", suffixes=("", "_prior"))
+            for c in keep:
+                was = current[f"{c}_prior"]
+                current[c] = was.where(was.notna(), current[c])
+            current = current.drop(columns=[f"{c}_prior" for c in keep])
+
     combined = pd.concat([base, current], ignore_index=True)[columns]
     return combined.drop_duplicates(subset=key_cols, keep="last")
 
@@ -572,7 +595,7 @@ master_fixtures_table = map_team_ids(master_fixtures_table, team_dim)
 # empty frame in: concatenating against the saved CSV would upcast every int64 column to
 # float64 and rewrite all 16 MB with 0 -> 0.0 for no gain.
 fpl_gameweek_fact = (
-    upsert_stats(master_player_stats_table, "FPL_DATA/fpl_gameweek_fact.csv", fpl20_24,            FPL_GAMEWEEK_COLS,   ['gw_id', 'player_id'])
+    upsert_stats(master_player_stats_table, "FPL_DATA/fpl_gameweek_fact.csv", fpl20_24,            FPL_GAMEWEEK_COLS,   ['gw_id', 'player_id'], freeze_cols=FROZEN_SNAPSHOT_COLS)
     if has_finished_gws else None
 )
 fixture_dim     = upsert_stats(master_fixtures_table,     "FPL_DATA/fixture_dim.csv",     fixtures_df,         FIXTURES_COLS,       ['match_id'])
