@@ -133,6 +133,7 @@ player_id,next_1_opp,next_1_diff,next_2_opp,next_2_diff,next_3_opp,next_3_diff,n
 583,mci,5,BHA,2,bou,3,LEE,2,cov,2
 585,AVL,3,mun,4,COV,2,che,4,CRY,3
 587,BHA,2,nfo,3,NEW,2,tot,3,FUL,2
+589,CHE,4,avl,4,LIV,4,hul,2,NFO,3
 600,IPS,2,hul,2,CHE,4,ars,5,new,3
 602,MUN,4,ips,2,HUL,2,cov,2,avl,4
 603,MCI,4,ful,3,TOT,3,lee,3,BOU,3
