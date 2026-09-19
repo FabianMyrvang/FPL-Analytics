@@ -34,7 +34,11 @@ import numpy as np
 import git
 import os
 
-from common import get_current_season, normalise_team_names, player_name_key, upsert_csv
+from common import (
+    get_current_season, normalise_team_names, player_name_key, upsert_csv,
+    DIM_PLAYER, DIM_POSITION, DIM_TEAM, DIM_FIXTURE, DIM_SEASON,
+    FACT_DETAILED_PLAYER_GW, FACT_DETAILED_FIXTURE,
+)
 
 SEASON_SHORT, SEASON_FOLDER = get_current_season()
 ELO_DATA_DIR = f"FPL-Core-Insights/data/{SEASON_FOLDER}"
@@ -42,11 +46,11 @@ print(f"Season: {SEASON_SHORT}  |  FPL-Core-Insights dir: {ELO_DATA_DIR}")
 
 # %%
 # Read each CSV file
-player_dim = pd.read_csv("FPL_DATA/player_dim.csv")
-position_dim = pd.read_csv("FPL_DATA/position_dim.csv")
-team_dim = pd.read_csv("FPL_DATA/team_dim.csv")
-fixture_dim = pd.read_csv("FPL_DATA/fixture_dim.csv")
-season_dim = pd.read_csv("FPL_DATA/season_dim.csv")
+player_dim = pd.read_csv(DIM_PLAYER)
+position_dim = pd.read_csv(DIM_POSITION)
+team_dim = pd.read_csv(DIM_TEAM)
+fixture_dim = pd.read_csv(DIM_FIXTURE)
+season_dim = pd.read_csv(DIM_SEASON)
 
 # %%
 ELO_FIXTURES_COLS = ['match_id','gw_id','home_team_id', 'away_team_id','home_team_elo', 'away_team_elo', 'home_possession',
@@ -78,7 +82,7 @@ ELO_FIXTURES_COLS = ['match_id','gw_id','home_team_id', 'away_team_id','home_tea
        'away_aerial_duels_won', 'home_successful_dribbles',
        'away_successful_dribbles']
 
-# The written schema for elo_fixture_fact.csv: the stat columns above plus the descriptive
+# The written schema for fact_detailed_fixture.csv: the stat columns above plus the descriptive
 # ones worth keeping. Deliberately excludes upstream internals that carry no analytical
 # value — home_team/away_team (raw source codes, already resolved to *_team_id),
 # match_url, fotmob_id, stats_processed, player_stats_processed, tournament, and GW
@@ -116,7 +120,7 @@ except Exception as exc:
           "If it looks stale, check for local modifications in that clone.")
 
 # %% [markdown]
-# ### ELO FIXTURE (TEAM) STATS  ->  FPL_DATA/elo_fixture_fact.csv
+# ### DETAILED FIXTURE (TEAM) STATS  ->  FPL_DATA/fact_detailed_fixture.csv
 #
 # Per-match team statistics, read from each gameweek's `fixtures.csv`.
 # The per-player table is built further down.
@@ -208,7 +212,7 @@ elo_fixtures['gw_id'] = elo_fixtures['match_id'].astype(str).str[:4].astype(int)
 elo_fixtures = elo_fixtures.reindex(columns=ELO_FIXTURE_OUTPUT_COLS)
 
 # %%
-upsert_csv(elo_fixtures, "FPL_DATA/elo_fixture_fact.csv",
+upsert_csv(elo_fixtures, FACT_DETAILED_FIXTURE,
            keys=["match_id"], columns=ELO_FIXTURE_OUTPUT_COLS)
 
 # %% [markdown]
@@ -254,7 +258,7 @@ elo_player_match_stats = pd.concat(elo_player_match_stats, ignore_index=True)
 # trivially satisfies "all values == 0" and would be dropped below, after which the
 # explicit drop list raises KeyError. There is nothing to upsert either way.
 if elo_player_match_stats.empty:
-    print("No player match stats published yet — leaving elo_gameweek_fact.csv untouched.")
+    print(f"No player match stats published yet — leaving {FACT_DETAILED_PLAYER_GW} untouched.")
     sys.exit(0)
 
 print(f"Player match stat rows found: {len(elo_player_match_stats)}")
@@ -351,5 +355,5 @@ elo_player_match_stats["was_home"] = (elo_player_match_stats["team_id"] == elo_p
 elo_player_match_stats = elo_player_match_stats.reindex(columns=ELO_PLAYER_COLS)
 
 # %%
-upsert_csv(elo_player_match_stats, "FPL_DATA/elo_gameweek_fact.csv",
+upsert_csv(elo_player_match_stats, FACT_DETAILED_PLAYER_GW,
            keys=["match_id", "player_id"], columns=ELO_PLAYER_COLS)

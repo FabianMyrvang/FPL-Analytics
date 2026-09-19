@@ -15,11 +15,18 @@
 # %%
 # --- repo-root bootstrap: resolve paths relative to the project root ---
 # Lets this code find "seed_data/", "FPL_DATA/", "FPL-Core-Insights/" etc. whether it is
-# run from notebooks/, scripts/, or the repo root.
+# run from notebooks/, scripts/, or the repo root. We chdir away from scripts/, so put it
+# on sys.path explicitly to keep `import common` working from either location.
 import os
+import sys
 from pathlib import Path
+_SCRIPTS_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
+if str(_SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_DIR))
 if Path.cwd().name in ("notebooks", "scripts"):
     os.chdir(Path.cwd().parent)
+
+from common import DIM_PLAYER, DIM_POSITION, DIM_TEAM, FACT_FPL_PLAYER_GW, FACT_DETAILED_PLAYER_GW
 
 # %% [markdown]
 # # FPL ELO Player Stats — Combined Old Pipeline + FBref
@@ -37,7 +44,7 @@ if Path.cwd().name in ("notebooks", "scripts"):
 # - Sole source for GW27+ rows where old pipeline is empty.
 # - `start_min` / `finish_min` computed from FBref minutes-played (old pipeline values unreliable).
 #
-# **Output:** `FPL_DATA/elo_gameweek_fact.csv` (40 columns)
+# **Output:** `FPL_DATA/fact_detailed_player_gw.csv` (40 columns)
 
 # %%
 # # !pip install soccerdata rapidfuzz requests beautifulsoup4
@@ -81,7 +88,7 @@ TEAM_NORM = {
     "Leeds United":      "Leeds",
 }
 
-# FBref position codes → abbreviation (matches position_dim.csv)
+# FBref position codes → abbreviation (matches dim_position.csv)
 POS_MAP = {
     "GK": "GK",
     "DF": "DEF", "CB": "DEF", "LB": "DEF", "RB": "DEF",
@@ -128,9 +135,9 @@ FBREF_OVERRIDE_GW = 26
 print(f"Setup complete. Target columns: {len(ELO_PLAYER_COLS)}")
 
 # %%
-player_dim   = pd.read_csv("FPL_DATA/player_dim.csv")
-position_dim = pd.read_csv("FPL_DATA/position_dim.csv")
-team_dim     = pd.read_csv("FPL_DATA/team_dim.csv")
+player_dim   = pd.read_csv(DIM_PLAYER)
+position_dim = pd.read_csv(DIM_POSITION)
+team_dim     = pd.read_csv(DIM_TEAM)
 
 team_name_to_id = dict(zip(team_dim["team"], team_dim["team_id"]))
 pos_name_to_id  = dict(zip(position_dim["position"], position_dim["position_id"]))
@@ -623,14 +630,14 @@ for col in ["match_id","player_id","team_id","position_id"]:
 df_save = df_out[df_out["player_id"].notna()].copy()
 
 # Ensure total_shots >= goals_scored (prevents >100% conversion rate when GW rows are sparse)
-fpl_gw = pd.read_csv("FPL_DATA/fpl_gameweek_fact.csv", usecols=["match_id", "player_id", "goals_scored"])
+fpl_gw = pd.read_csv(FACT_FPL_PLAYER_GW, usecols=["match_id", "player_id", "goals_scored"])
 fpl_gw = fpl_gw[fpl_gw["goals_scored"] > 0].copy()
 df_save = df_save.merge(fpl_gw, on=["match_id", "player_id"], how="left")
 df_save["total_shots"] = df_save[["total_shots", "goals_scored"]].max(axis=1)
 df_save = df_save.drop(columns=["goals_scored"])
 
-df_save.to_csv("FPL_DATA/elo_gameweek_fact.csv", index=False)
-print(f"Saved: FPL_DATA/elo_gameweek_fact.csv  ({len(df_save)} rows, {len(df_save.columns)} cols)")
+df_save.to_csv(FACT_DETAILED_PLAYER_GW, index=False)
+print(f"Saved: {FACT_DETAILED_PLAYER_GW}  ({len(df_save)} rows, {len(df_save.columns)} cols)")
 print(f"Dropped {len(df_out) - len(df_save)} rows with null player_id")
 
 # %%

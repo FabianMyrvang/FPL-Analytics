@@ -11,6 +11,25 @@ from datetime import datetime
 import pandas as pd
 
 
+# Every published output lives here. Reference these constants rather than literal paths: several
+# reads silently fall back to seed data when their file is missing (upsert_stats, the player/team
+# ID bases, upsert_csv), so a single stale filename would rebuild history and reassign IDs without
+# raising. Keeping the names in one place makes a rename a one-line change.
+DATA_DIR = "FPL_DATA"
+
+DIM_PLAYER = f"{DATA_DIR}/dim_player.csv"
+DIM_TEAM = f"{DATA_DIR}/dim_team.csv"
+DIM_POSITION = f"{DATA_DIR}/dim_position.csv"
+DIM_SEASON = f"{DATA_DIR}/dim_season.csv"
+DIM_FIXTURE = f"{DATA_DIR}/dim_fixture.csv"
+DIM_PLAYER_NEXT_FIXTURES = f"{DATA_DIR}/dim_player_next_fixtures.csv"
+
+FACT_FPL_PLAYER_GW = f"{DATA_DIR}/fact_fpl_player_gw.csv"
+FACT_FPL_FIXTURE = f"{DATA_DIR}/fact_fpl_fixture.csv"
+FACT_DETAILED_PLAYER_GW = f"{DATA_DIR}/fact_detailed_player_gw.csv"
+FACT_DETAILED_FIXTURE = f"{DATA_DIR}/fact_detailed_fixture.csv"
+
+
 def get_current_season(today=None):
     """Return (season_short, season_folder) for the season containing `today`.
 
@@ -39,7 +58,7 @@ def get_current_season(today=None):
     return season_short, season_folder
 
 
-# Canonical team names live in FPL_DATA/team_dim.csv. Both the FPL API and
+# Canonical team names live in FPL_DATA/dim_team.csv. Both the FPL API and
 # FPL-Core-Insights occasionally rename a club mid-life — 2026-27 turned "Ipswich" into
 # "Ipswich Town". Matching on the raw name would treat the rename as a debutant, mint a
 # fresh team_id and orphan every prior season of that club's history. Worse, the elo

@@ -90,7 +90,11 @@ FROZEN_SNAPSHOT_COLS = ['selected_by_percent', 'now_cost', 'transfers_in', 'tran
 
 
 # %%
-from common import get_current_season, normalise_team_names
+from common import (
+    get_current_season, normalise_team_names,
+    DIM_PLAYER, DIM_TEAM, DIM_POSITION, DIM_SEASON, DIM_FIXTURE, DIM_PLAYER_NEXT_FIXTURES,
+    FACT_FPL_PLAYER_GW, FACT_FPL_FIXTURE,
+)
 
 SEASON_SHORT, _ = get_current_season()
 print(f"Season: {SEASON_SHORT}")
@@ -571,11 +575,11 @@ position_dim = positions_df
 # Use the existing saved lookup as the base so previously-assigned player_ids
 # (incl. current-season debutants) stay stable across seasons. Fall back to the
 # static historical file only on the very first run.
-player_base = pd.read_csv("FPL_DATA/player_dim.csv") if os.path.exists("FPL_DATA/player_dim.csv") else players_df
+player_base = pd.read_csv(DIM_PLAYER) if os.path.exists(DIM_PLAYER) else players_df
 player_dim = creating_player_ids(fpl_api_players, player_base)
 
 # Team lookup table (existing saved lookup as base for the same reason)
-team_base = pd.read_csv("FPL_DATA/team_dim.csv") if os.path.exists("FPL_DATA/team_dim.csv") else teams_df
+team_base = pd.read_csv(DIM_TEAM) if os.path.exists(DIM_TEAM) else teams_df
 team_dim = team_merge(fpl_api_teams, team_base)
 
 # MASTER PLAYER STATS TABLE
@@ -595,26 +599,26 @@ master_fixtures_table = map_team_ids(master_fixtures_table, team_dim)
 # empty frame in: concatenating against the saved CSV would upcast every int64 column to
 # float64 and rewrite all 16 MB with 0 -> 0.0 for no gain.
 fpl_gameweek_fact = (
-    upsert_stats(master_player_stats_table, "FPL_DATA/fpl_gameweek_fact.csv", fpl20_24,            FPL_GAMEWEEK_COLS,   ['gw_id', 'player_id'], freeze_cols=FROZEN_SNAPSHOT_COLS)
+    upsert_stats(master_player_stats_table, FACT_FPL_PLAYER_GW, fpl20_24,            FPL_GAMEWEEK_COLS,   ['gw_id', 'player_id'], freeze_cols=FROZEN_SNAPSHOT_COLS)
     if has_finished_gws else None
 )
-fixture_dim     = upsert_stats(master_fixtures_table,     "FPL_DATA/fixture_dim.csv",     fixtures_df,         FIXTURES_COLS,       ['match_id'])
-season_dim      = upsert_stats(master_fixtures_table,     "FPL_DATA/season_dim.csv",      fixtures_df,         SEASON_COLS,         ['gw_id']).dropna(subset=['gw_id']).reset_index(drop=True)
-fpl_fixture_fact  = upsert_stats(master_fixtures_table,     "FPL_DATA/fpl_fixture_fact.csv",  fixtures_stats20_24, FIXTURES_STATS_COLS, ['match_id'])
+fixture_dim     = upsert_stats(master_fixtures_table,     DIM_FIXTURE,        fixtures_df,         FIXTURES_COLS,       ['match_id'])
+season_dim      = upsert_stats(master_fixtures_table,     DIM_SEASON,         fixtures_df,         SEASON_COLS,         ['gw_id']).dropna(subset=['gw_id']).reset_index(drop=True)
+fpl_fixture_fact  = upsert_stats(master_fixtures_table,   FACT_FPL_FIXTURE,   fixtures_stats20_24, FIXTURES_STATS_COLS, ['match_id'])
 
 # %%
 # Export each DataFrame
-player_dim.to_csv("FPL_DATA/player_dim.csv", index=False)
-position_dim.to_csv("FPL_DATA/position_dim.csv", index = False)
-team_dim.to_csv("FPL_DATA/team_dim.csv", index=False)
-fixture_dim.to_csv("FPL_DATA/fixture_dim.csv", index=False)
-season_dim.to_csv("FPL_DATA/season_dim.csv", index=False)
+player_dim.to_csv(DIM_PLAYER, index=False)
+position_dim.to_csv(DIM_POSITION, index = False)
+team_dim.to_csv(DIM_TEAM, index=False)
+fixture_dim.to_csv(DIM_FIXTURE, index=False)
+season_dim.to_csv(DIM_SEASON, index=False)
 
-fpl_fixture_fact.to_csv("FPL_DATA/fpl_fixture_fact.csv",index= False)
+fpl_fixture_fact.to_csv(FACT_FPL_FIXTURE, index= False)
 if fpl_gameweek_fact is not None:
-    fpl_gameweek_fact.to_csv("FPL_DATA/fpl_gameweek_fact.csv", index=False)
+    fpl_gameweek_fact.to_csv(FACT_FPL_PLAYER_GW, index=False)
 else:
-    print("Left FPL_DATA/fpl_gameweek_fact.csv untouched (no new gameweek data).")
+    print(f"Left {FACT_FPL_PLAYER_GW} untouched (no new gameweek data).")
 
 # %%
 # --- NEXT 5 FIXTURES (per player) ---
@@ -649,7 +653,7 @@ upcoming["kickoff_time"] = pd.to_datetime(upcoming["kickoff_time"], utc=True, er
 upcoming = upcoming[upcoming["kickoff_time"] >= pd.Timestamp.now(tz="UTC")]
 
 if upcoming.empty:
-    print("No upcoming fixtures — skipping FPL_DATA/player_next_fixtures.csv.")
+    print(f"No upcoming fixtures — skipping {DIM_PLAYER_NEXT_FIXTURES}.")
 else:
     # A fixture names two clubs, so unpivot to one row per team before "this team's next
     # match" becomes a simple sort.
@@ -707,6 +711,6 @@ else:
             player_next_fixtures[f"next_{_i}_diff"].astype("Int64")
         )
 
-    player_next_fixtures.to_csv("FPL_DATA/player_next_fixtures.csv", index=False)
-    print(f"Wrote FPL_DATA/player_next_fixtures.csv "
+    player_next_fixtures.to_csv(DIM_PLAYER_NEXT_FIXTURES, index=False)
+    print(f"Wrote {DIM_PLAYER_NEXT_FIXTURES} "
           f"({len(player_next_fixtures)} players, next {NEXT_N} fixtures each)")

@@ -38,30 +38,25 @@ The datasets live in [`FPL_DATA/`](FPL_DATA/) as CSVs and can be used directly.
 
 **Fact tables**
 
-| File                    | Contents                                                                        | Seasons           | Source |
-| ----------------------- | ------------------------------------------------------------------------------- | ----------------- | ------ |
-| `fpl_gameweek_fact.csv` | Per-player per-gameweek FPL scoring: points, goals, assists, xG, minutes, price | 2020–21 → present | FPL API + vaastav archive |
-| `fpl_fixture_fact.csv`  | Fixture results and FPL difficulty ratings                                      | 2020–21 → present | FPL API + vaastav archive |
-| `elo_gameweek_fact.csv` | Per-player per-match detailed stats: shots, passes, duels, dribbles, etc.       | 2025–26 → present | FPL-Core-Insights (olbauday) |
-| `elo_fixture_fact.csv`  | Per-match team stats with ELO ratings                                           | 2025–26 → present | FPL-Core-Insights (olbauday) |
+| File                          | Contents                                                                                   | Seasons           | Source |
+| ----------------------------- | ------------------------------------------------------------------------------------------ | ----------------- | ------ |
+| `fact_fpl_player_gw.csv`      | Per-player per-gameweek FPL scoring: points, goals, assists, xG, minutes, price, ownership | 2020–21 → present | FPL API + vaastav archive |
+| `fact_fpl_fixture.csv`        | Fixture results and FPL difficulty ratings                                                 | 2020–21 → present | FPL API + vaastav archive |
+| `fact_detailed_player_gw.csv` | Per-player per-match detailed stats: shots, passes, duels, dribbles, etc.                  | 2025–26 → present | FPL-Core-Insights (olbauday) |
+| `fact_detailed_fixture.csv`   | Per-match detailed team stats with ELO ratings                                             | 2025–26 → present | FPL-Core-Insights (olbauday) |
 
 **Dimension tables**
 
-| File               | Contents                                     |
-| ------------------ | -------------------------------------------- |
-| `player_dim.csv`   | Persistent cross-season player IDs and names |
-| `team_dim.csv`     | Persistent cross-season team IDs and names   |
-| `position_dim.csv` | Position ID mapping (GK / DEF / MID / FWD)   |
-| `fixture_dim.csv`  | Historical fixture list with persistent IDs  |
-| `season_dim.csv`   | Season ID mapping                            |
+| File                           | Contents                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `dim_player.csv`               | Persistent cross-season player IDs and names                                                  |
+| `dim_team.csv`                 | Persistent cross-season team IDs and names                                                    |
+| `dim_position.csv`             | Position ID mapping (GK / DEF / MID / FWD)                                                    |
+| `dim_fixture.csv`              | Historical fixture list with persistent IDs                                                   |
+| `dim_season.csv`               | Season ID mapping                                                                             |
+| `dim_player_next_fixtures.csv` | Each current-season player's next five fixtures: opponent short code and FPL difficulty (1–5) |
 
-**Helper tables**
-
-| File                        | Contents                                                                     |
-| --------------------------- | ---------------------------------------------------------------------------- |
-| `player_next_fixtures.csv`  | Each current-season player's next five fixtures: opponent short code and FPL difficulty (1–5) |
-
-`player_next_fixtures.csv` is a **snapshot**, rebuilt in full on every run rather than accumulated,
+`dim_player_next_fixtures.csv` is a **snapshot**, rebuilt in full on every run rather than accumulated,
 because "the next five" moves as the season advances. Opponent codes use case to show venue —
 `BOU` is home, `bou` is away.
 
