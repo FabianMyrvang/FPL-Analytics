@@ -92,7 +92,7 @@ FROZEN_SNAPSHOT_COLS = ['selected_by_percent', 'now_cost', 'transfers_in', 'tran
 # %%
 from common import (
     get_current_season, normalise_team_names,
-    DIM_PLAYER, DIM_TEAM, DIM_POSITION, DIM_SEASON, DIM_FIXTURE, DIM_PLAYER_NEXT_FIXTURES,
+    DIM_PLAYER, DIM_TEAM, DIM_POSITION, DIM_SEASON, DIM_FIXTURE, FACT_PLAYER_NEXT_FIXTURES,
     FACT_FPL_PLAYER_GW, FACT_FPL_FIXTURE,
 )
 
@@ -653,7 +653,7 @@ upcoming["kickoff_time"] = pd.to_datetime(upcoming["kickoff_time"], utc=True, er
 upcoming = upcoming[upcoming["kickoff_time"] >= pd.Timestamp.now(tz="UTC")]
 
 if upcoming.empty:
-    print(f"No upcoming fixtures — skipping {DIM_PLAYER_NEXT_FIXTURES}.")
+    print(f"No upcoming fixtures — skipping {FACT_PLAYER_NEXT_FIXTURES}.")
 else:
     # A fixture names two clubs, so unpivot to one row per team before "this team's next
     # match" becomes a simple sort.
@@ -666,29 +666,22 @@ else:
         is_home=False, difficulty=upcoming["team_a_difficulty"],
     )
     team_fixtures = pd.concat([_home, _away], ignore_index=True)[
-        ["team_id", "opponent_id", "is_home", "difficulty", "kickoff_time"]
+        ["team_id", "opponent_id", "is_home", "difficulty", "kickoff_time", "gw_id"]
     ].dropna(subset=["team_id", "opponent_id"])
 
     # Chronological order handles double and blank gameweeks with no special-casing.
     team_fixtures = team_fixtures.sort_values(["team_id", "kickoff_time"])
-    team_fixtures["slot"] = team_fixtures.groupby("team_id").cumcount() + 1
-    team_fixtures = team_fixtures[team_fixtures["slot"] <= NEXT_N]
+    team_fixtures["fixture_order"] = team_fixtures.groupby("team_id").cumcount() + 1
+    team_fixtures = team_fixtures[team_fixtures["fixture_order"] <= NEXT_N]
 
     # Case carries the venue, matching the convention used by public FPL fixture tickers.
-    team_fixtures["opp"] = [
+    # `is_home` is kept as its own column so the venue is filterable, not just readable.
+    team_fixtures["opponent"] = [
         (code.upper() if home else code.lower()) if isinstance(code, str) else None
         for code, home in zip(
             team_fixtures["opponent_id"].map(persistent_to_short), team_fixtures["is_home"]
         )
     ]
-
-    wide = team_fixtures.pivot(index="team_id", columns="slot", values=["opp", "difficulty"])
-    wide.columns = [
-        f"next_{slot}_{'opp' if kind == 'opp' else 'diff'}" for kind, slot in wide.columns
-    ]
-    wide = wide.reindex(
-        columns=[f"next_{i}_{k}" for i in range(1, NEXT_N + 1) for k in ("opp", "diff")]
-    ).reset_index()
 
     players = fpl_api_players[["full_name", "team_id"]].copy()
     players["team_id"] = players["team_id"].map(api_team_to_persistent)
@@ -699,18 +692,20 @@ else:
         print(f"WARNING — {_unmatched} current player(s) did not match player_dim; "
               "they will have no fixture chips.")
 
+    # Long format: one row per player per upcoming fixture. A repeating group of
+    # next_1..next_5 columns would be a dimensional anti-pattern — it fixes N in the schema
+    # and makes "average difficulty over the next 3" impossible without column arithmetic.
     player_next_fixtures = (
         players.dropna(subset=["player_id", "team_id"])
-        .merge(wide, on="team_id", how="left")
-        .drop(columns=["full_name", "team_id"])
+        .merge(team_fixtures, on="team_id", how="inner")
         .astype({"player_id": int})
-        .sort_values("player_id")
+        .sort_values(["player_id", "fixture_order"])
+        [["player_id", "fixture_order", "gw_id", "opponent", "is_home", "difficulty"]]
     )
-    for _i in range(1, NEXT_N + 1):
-        player_next_fixtures[f"next_{_i}_diff"] = (
-            player_next_fixtures[f"next_{_i}_diff"].astype("Int64")
-        )
+    player_next_fixtures["difficulty"] = player_next_fixtures["difficulty"].astype("Int64")
+    player_next_fixtures["gw_id"] = player_next_fixtures["gw_id"].astype("Int64")
 
-    player_next_fixtures.to_csv(DIM_PLAYER_NEXT_FIXTURES, index=False)
-    print(f"Wrote {DIM_PLAYER_NEXT_FIXTURES} "
-          f"({len(player_next_fixtures)} players, next {NEXT_N} fixtures each)")
+    player_next_fixtures.to_csv(FACT_PLAYER_NEXT_FIXTURES, index=False)
+    print(f"Wrote {FACT_PLAYER_NEXT_FIXTURES} "
+          f"({player_next_fixtures.player_id.nunique()} players, "
+          f"{len(player_next_fixtures)} rows, next {NEXT_N} fixtures each)")

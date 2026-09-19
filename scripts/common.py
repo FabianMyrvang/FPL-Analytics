@@ -22,8 +22,10 @@ DIM_TEAM = f"{DATA_DIR}/dim_team.csv"
 DIM_POSITION = f"{DATA_DIR}/dim_position.csv"
 DIM_SEASON = f"{DATA_DIR}/dim_season.csv"
 DIM_FIXTURE = f"{DATA_DIR}/dim_fixture.csv"
-DIM_PLAYER_NEXT_FIXTURES = f"{DATA_DIR}/dim_player_next_fixtures.csv"
 
+# Long format — one row per player per upcoming fixture, so it is a fact/bridge rather than a
+# dimension: it fans out 1:many against dim_player.
+FACT_PLAYER_NEXT_FIXTURES = f"{DATA_DIR}/fact_player_next_fixtures.csv"
 FACT_FPL_PLAYER_GW = f"{DATA_DIR}/fact_fpl_player_gw.csv"
 FACT_FPL_FIXTURE = f"{DATA_DIR}/fact_fpl_fixture.csv"
 FACT_DETAILED_PLAYER_GW = f"{DATA_DIR}/fact_detailed_player_gw.csv"

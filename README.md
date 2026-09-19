@@ -44,6 +44,7 @@ The datasets live in [`FPL_DATA/`](FPL_DATA/) as CSVs and can be used directly.
 | `fact_fpl_fixture.csv`        | Fixture results and FPL difficulty ratings                                                 | 2020–21 → present | FPL API + vaastav archive |
 | `fact_detailed_player_gw.csv` | Per-player per-match detailed stats: shots, passes, duels, dribbles, etc.                  | 2025–26 → present | FPL-Core-Insights (olbauday) |
 | `fact_detailed_fixture.csv`   | Per-match detailed team stats with ELO ratings                                             | 2025–26 → present | FPL-Core-Insights (olbauday) |
+| `fact_player_next_fixtures.csv` | One row per player per upcoming fixture: opponent, venue, FPL difficulty (1–5)            | current season    | FPL API |
 
 **Dimension tables**
 
@@ -54,11 +55,12 @@ The datasets live in [`FPL_DATA/`](FPL_DATA/) as CSVs and can be used directly.
 | `dim_position.csv`             | Position ID mapping (GK / DEF / MID / FWD)                                                    |
 | `dim_fixture.csv`              | Historical fixture list with persistent IDs                                                   |
 | `dim_season.csv`               | Season ID mapping                                                                             |
-| `dim_player_next_fixtures.csv` | Each current-season player's next five fixtures: opponent short code and FPL difficulty (1–5) |
 
-`dim_player_next_fixtures.csv` is a **snapshot**, rebuilt in full on every run rather than accumulated,
-because "the next five" moves as the season advances. Opponent codes use case to show venue —
-`BOU` is home, `bou` is away.
+`fact_player_next_fixtures.csv` is a **snapshot**, rebuilt in full on every run rather than
+accumulated, because "the next five" moves as the season advances. It is in long format — five rows
+per player, ordered by `fixture_order` — so the horizon isn't fixed by the schema and difficulty can
+be aggregated. Opponent codes also carry the venue in their case (`BOU` home, `bou` away), with
+`is_home` available as a proper boolean.
 
 ## Credits
 
