@@ -176,6 +176,7 @@ player_id,next_1_opp,next_1_diff,next_2_opp,next_2_diff,next_3_opp,next_3_diff,n
 727,bou,3,MCI,4,bre,3,BHA,2,ARS,4
 734,hul,2,CHE,4,ars,5,new,3,COV,2
 736,CRY,3,ars,5,MUN,4,sun,3,bou,3
+738,BRE,3,new,3,MCI,4,FUL,2,mun,4
 745,mun,4,COV,2,che,4,CRY,3,lee,3
 751,hul,2,CHE,4,ars,5,new,3,COV,2
 753,sun,3,CRY,3,liv,4,mci,5,BRE,3
@@ -280,6 +281,7 @@ player_id,next_1_opp,next_1_diff,next_2_opp,next_2_diff,next_3_opp,next_3_diff,n
 1219,mun,4,COV,2,che,4,CRY,3,lee,3
 1220,avl,4,LIV,4,hul,2,NFO,3,bha,3
 1221,bou,3,MCI,4,bre,3,BHA,2,ARS,4
+1224,cov,2,AVL,3,cry,3,EVE,3,ful,3
 1226,sun,3,CRY,3,liv,4,mci,5,BRE,3
 1231,mun,4,COV,2,che,4,CRY,3,lee,3
 1234,BOU,3,eve,3,TOT,3,MUN,4,sun,3
@@ -661,3 +663,6 @@ player_id,next_1_opp,next_1_diff,next_2_opp,next_2_diff,next_3_opp,next_3_diff,n
 2157,sun,3,CRY,3,liv,4,mci,5,BRE,3
 2158,cov,2,AVL,3,cry,3,EVE,3,ful,3
 2159,BOU,3,eve,3,TOT,3,MUN,4,sun,3
+2160,cov,2,AVL,3,cry,3,EVE,3,ful,3
+2161,cov,2,AVL,3,cry,3,EVE,3,ful,3
+2162,cov,2,AVL,3,cry,3,EVE,3,ful,3
