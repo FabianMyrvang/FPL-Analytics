@@ -19,7 +19,7 @@ automatically as the data updates:
 - **FPL-Core-Insights** (by [olbauday](https://github.com/olbauday/FPL-Core-Insights)) — detailed per-match player & team stats
 - **Fantasy-Premier-League archive** (by [vaastav](https://github.com/vaastav/Fantasy-Premier-League)) — historical seasons (2020–25), used to seed the first run
 
-An experimental FBref scraper also exists (`scripts/04_fpl_elo_player_backup_scraper.py`) as a backup if other data degrades.
+An experimental FBref scraper also exists (`scripts/04_fpl_detailed_player_backup_scraper.py`) as a backup if other data degrades.
 
 ## Updates
 

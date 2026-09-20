@@ -1,6 +1,6 @@
 """Shared helpers for the FPL pipeline scripts.
 
-Imported by 02_fpl_api.py, 03_fpl_elo_player.py and 04_fpl_elo_player_backup_scraper.py.
+Imported by 02_fpl_api.py, 03_fpl_detailed_player.py and 04_fpl_detailed_player_backup_scraper.py.
 Kept dependency-light (pandas only) so it works under the slim requirements-ci.txt.
 """
 
@@ -67,7 +67,7 @@ def get_current_season(today=None):
 # scripts silently DROP rows whose team name will not resolve, so a rename can delete a
 # club's fixtures rather than raise. Map incoming names onto the canonical form.
 #
-# Also covers the longer FBref spellings used by 04_fpl_elo_player_backup_scraper.py.
+# Also covers the longer FBref spellings used by 04_fpl_detailed_player_backup_scraper.py.
 TEAM_ALIASES = {
     "Ipswich Town":      "Ipswich",
     "Leicester City":    "Leicester",

@@ -141,7 +141,7 @@ fpl_api_players["selected_by_percent"] = pd.to_numeric(
 # orphan every prior season of that club's history. Normalise onto the canonical form
 # already stored in team_dim, at source, so every downstream name->id lookup agrees —
 # map_team_ids silently DROPS rows whose team name it cannot resolve.
-# TEAM_ALIASES lives in scripts/common.py, shared with 03_fpl_elo_player.py.
+# TEAM_ALIASES lives in scripts/common.py, shared with 03_fpl_detailed_player.py.
 
 # DIM: Teams (include code for kit image URLs)
 fpl_api_teams = pd.DataFrame(bootstrap['teams'])[

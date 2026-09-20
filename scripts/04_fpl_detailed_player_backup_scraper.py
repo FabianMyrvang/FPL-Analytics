@@ -63,7 +63,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # Old version schema — 42 columns (unchanged)
-ELO_PLAYER_COLS = [
+DETAILED_PLAYER_COLS = [
     "match_id", "player_id", "team_id", "position_id", "gw_id", "was_home",
     "total_shots", "shots_on_target", "successful_dribbles", "big_chances_missed",
     "touches_opposition_box", "touches", "accurate_passes", "chances_created",
@@ -132,7 +132,7 @@ FBREF_OVERRIDE_COLS = [
 ]
 FBREF_OVERRIDE_GW = 26
 
-print(f"Setup complete. Target columns: {len(ELO_PLAYER_COLS)}")
+print(f"Setup complete. Target columns: {len(DETAILED_PLAYER_COLS)}")
 
 # %%
 player_dim   = pd.read_csv(DIM_PLAYER)
@@ -419,9 +419,9 @@ for c in keeper_df.columns.tolist():
 ELO_BASE = "FPL-Core-Insights/data/2025-2026"
 ELO_PL   = f"{ELO_BASE}/By Tournament/Premier League"
 
-elo_players_raw = pd.read_csv(f"{ELO_BASE}/players.csv")
-elo_teams_raw   = pd.read_csv(f"{ELO_BASE}/teams.csv")
-elo_players_raw["full_name"] = elo_players_raw["first_name"] + " " + elo_players_raw["second_name"]
+detailed_players_raw = pd.read_csv(f"{ELO_BASE}/players.csv")
+detailed_teams_raw   = pd.read_csv(f"{ELO_BASE}/teams.csv")
+detailed_players_raw["full_name"] = detailed_players_raw["first_name"] + " " + detailed_players_raw["second_name"]
 
 # Load all GW playermatchstats, joining fixtures for home/away team codes
 old_frames = []
@@ -448,14 +448,14 @@ _drop = ["minutes_played","goals","assists","xg","xa","penalties_missed",
 old_raw = old_raw.drop(columns=[c for c in _drop if c in old_raw.columns])
 
 # Translate FPL-Core player_id → full_name, then get PBI player_id via full_name
-old_raw = pd.merge(old_raw, elo_players_raw[["player_id","full_name"]],
+old_raw = pd.merge(old_raw, detailed_players_raw[["player_id","full_name"]],
                    how="left", on="player_id").drop(columns=["player_id"])
 
 # Map home/away team codes → names → PBI team IDs
-old_raw = (pd.merge(old_raw, elo_teams_raw[["code","name"]], how="left",
+old_raw = (pd.merge(old_raw, detailed_teams_raw[["code","name"]], how="left",
                     left_on="home_team", right_on="code")
            .drop(columns=["code"]).rename(columns={"name":"home_team_name"}))
-old_raw = (pd.merge(old_raw, elo_teams_raw[["code","name"]], how="left",
+old_raw = (pd.merge(old_raw, detailed_teams_raw[["code","name"]], how="left",
                     left_on="away_team", right_on="code")
            .drop(columns=["code"]).rename(columns={"name":"away_team_name"}))
 old_raw = (pd.merge(old_raw, team_dim, how="left",
@@ -481,9 +481,9 @@ old_raw = pd.merge(old_raw, player_dim[["player_id","full_name"]],
                    how="left", on="full_name")
 
 # Resolve team_id: player's team code → team name → PBI team_id
-old_raw = pd.merge(old_raw, elo_players_raw[["full_name","team_code","position"]],
+old_raw = pd.merge(old_raw, detailed_players_raw[["full_name","team_code","position"]],
                    how="left", on="full_name")
-old_raw = (pd.merge(old_raw, elo_teams_raw[["code","name"]], how="left",
+old_raw = (pd.merge(old_raw, detailed_teams_raw[["code","name"]], how="left",
                     left_on="team_code", right_on="code")
            .drop(columns=["team_code","code"]))
 old_raw = (pd.merge(old_raw, team_dim, how="left", left_on="name", right_on="team")
@@ -497,11 +497,11 @@ old_raw = old_raw.drop(columns=["position"], errors="ignore")
 old_raw["was_home"] = (old_raw["team_id"] == old_raw["home_team_id"]).astype(int)
 
 # Ensure every target column exists (fill missing with 0, matching old version convention)
-for col in ELO_PLAYER_COLS:
+for col in DETAILED_PLAYER_COLS:
     if col not in old_raw.columns:
         old_raw[col] = 0
 
-old_df = old_raw[ELO_PLAYER_COLS].copy()
+old_df = old_raw[DETAILED_PLAYER_COLS].copy()
 
 gws = sorted(old_raw["GW"].dropna().unique().astype(int))
 print(f"Old pipeline: {len(old_df):,} rows  GW{min(gws)}–GW{max(gws)}")
@@ -587,15 +587,15 @@ fb_keys = pd.MultiIndex.from_arrays([
 fb_extra = _fb_valid[~fb_keys.isin(old_keys)].copy()
 
 if not fb_extra.empty:
-    for col in ELO_PLAYER_COLS:
+    for col in DETAILED_PLAYER_COLS:
         if col not in fb_extra.columns:
             fb_extra[col] = np.nan
-    df_out = pd.concat([df_combined, fb_extra[ELO_PLAYER_COLS]], ignore_index=True)
+    df_out = pd.concat([df_combined, fb_extra[DETAILED_PLAYER_COLS]], ignore_index=True)
     print(f"Added {len(fb_extra)} FBref supplement rows")
 else:
     df_out = df_combined.copy()
 
-df_out = df_out[ELO_PLAYER_COLS].copy()
+df_out = df_out[DETAILED_PLAYER_COLS].copy()
 print(f"Output shape: {df_out.shape}")
 
 gw_counts = df_out.groupby(df_out["gw_id"].astype(int) % 100).size()
@@ -607,7 +607,7 @@ df_out.head(3)
 # Null / zero rates for key stat columns
 print("=== Data quality check ===\n")
 
-stat_cols = [c for c in ELO_PLAYER_COLS if c not in
+stat_cols = [c for c in DETAILED_PLAYER_COLS if c not in
              ["match_id","player_id","team_id","position_id","gw_id","was_home"]]
 
 null_rate = df_out[stat_cols].isna().mean().round(3)

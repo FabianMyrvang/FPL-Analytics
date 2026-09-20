@@ -72,13 +72,13 @@ jobs:
         if: steps.guard.outputs.run == 'true'
         run: git clone --depth 1 https://github.com/olbauday/FPL-Core-Insights.git
 
-      - name: Run pipeline (FPL API -> elo player stats)
+      - name: Run pipeline (FPL API -> detailed player stats)
         if: steps.guard.outputs.run == 'true'
         env:
           MPLBACKEND: Agg
         run: |
           python scripts/02_fpl_api.py
-          python scripts/03_fpl_elo_player.py
+          python scripts/03_fpl_detailed_player.py
 
       - name: Commit & push updated data
         if: steps.guard.outputs.run == 'true'
