@@ -21,8 +21,25 @@ Fantasy-Premier-League/
 
 # seed_data/ is tracked — required input for 02_fpl_api.py
 
-# exports/ is tracked — the predictions spreadsheet is a published deliverable, kept out of
-# FPL_DATA/ so that directory stays pure CSV for the Power BI / raw-URL consumers.
+# --- Points-prediction model: kept private for now -----------------------------------------
+# The modelling code and its outputs are deliberately not published yet. They still exist and
+# run locally; they are simply untracked. NOTE this does not erase them from history — they were
+# public in commit 4bb3699 and remain visible there. Removing them from the current tree only
+# stops further exposure.
+#
+# Consequence: with 05_ untracked there is nothing for a CI job to run, so predict-points.yml is
+# untracked too and predictions are generated locally when wanted.
+scripts/model_common.py
+scripts/05_fpl_predict_points.py
+scripts/06_fpl_model_backtest.py
+requirements-model.txt
+.github/workflows/predict-points.yml
+exports/
+
+FPL_DATA/fact_player_points_prediction.csv
+FPL_DATA/fact_player_points_prediction_history.csv
+FPL_DATA/fact_model_backtest_metric.csv
+FPL_DATA/dim_model.csv
 
 # Cache directories
 pl_api_cache/

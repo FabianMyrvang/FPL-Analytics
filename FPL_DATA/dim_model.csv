@@ -1,9 +1,0 @@
-model_name,model_label,model_family,is_baseline,is_primary,description
-baseline_zero,Baseline: zero,baseline,1,0,Predicts 0 for everyone. The floor — 59% of player-gameweeks really are zero.
-baseline_season_mean,Baseline: season average,baseline,1,0,Player's average points so far this season.
-baseline_last5,Baseline: last 5 average,baseline,1,0,Player's average points over their last five fixtures.
-baseline_pp90_minutes,Baseline: rate x minutes,baseline,1,0,"Long-run points per 90 scaled by recent minutes — quality times availability, unfitted."
-linear_2stage,Ridge (two-stage),linear,0,0,"Logistic regression for playing time, ridge regression for points given playing."
-gbm_2stage,Gradient boosting (two-stage),gbm,0,0,"Histogram gradient boosting for both stages, squared-error loss."
-gbm_poisson_2stage,"Gradient boosting, Poisson",gbm,0,0,"As above with a Poisson loss, which suits count-like scoring."
-blend_2stage,Blend of all three models,blend,0,1,"Average of the ridge, gradient boosting and Poisson predictions. Best on backtest."
