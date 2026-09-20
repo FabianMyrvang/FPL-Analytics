@@ -1,0 +1,16 @@
+# Additional dependencies for the points-prediction workflow. Install ALONGSIDE
+# requirements-ci.txt, not instead of it:
+#
+#   pip install -r requirements-ci.txt -r requirements-model.txt
+#
+# Kept out of requirements-ci.txt on purpose. That file feeds update-data.yml, which runs every
+# four hours and is deliberately slim; the modelling job runs once a day and is the only thing
+# that needs these.
+#
+# scikit-learn only — no LightGBM or XGBoost. HistGradientBoosting* is a histogram gradient
+# booster of the same class, handles NaN natively (which matters, because the feature
+# availability cliffs in this dataset are structural rather than random), and ships inside
+# scikit-learn. That keeps this job at two extra packages instead of five, and the accuracy
+# difference on ~110k rows x 63 features is inside noise.
+scikit-learn==1.8.0
+openpyxl==3.1.5

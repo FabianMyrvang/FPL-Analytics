@@ -21,6 +21,9 @@ Fantasy-Premier-League/
 
 # seed_data/ is tracked — required input for 02_fpl_api.py
 
+# exports/ is tracked — the predictions spreadsheet is a published deliverable, kept out of
+# FPL_DATA/ so that directory stays pure CSV for the Power BI / raw-URL consumers.
+
 # Cache directories
 pl_api_cache/
 downloaded_files/
