@@ -23,7 +23,7 @@ An experimental FBref scraper also exists (`scripts/04_fpl_elo_player_backup_scr
 
 ## Updates
 
-- **Updated daily during the season** during the season
+- **Updated daily during the season**
 
 ## Output
 
