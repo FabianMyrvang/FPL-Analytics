@@ -60,7 +60,6 @@ PLAYER_COLS = ['player_id','Full Name','Player Name','photo_url']
 # The older `…/premierleague/photos/players/110x140/p{code}.png` form also works but covers
 # noticeably less of the squad (39/60 sampled vs 54/60).
 PLAYER_PHOTO_URL = "https://resources.premierleague.com/premierleague25/photos/players/110x140/{code}.png"
-TEAM_KIT_URL = "https://fantasy.premierleague.com/dist/img/shirts/standard/shirt_{code}-110.png"
 
 TEAM_COLS = ['team_id','team','team_badge']
 
@@ -293,28 +292,23 @@ def creating_player_ids(new_players : pd.DataFrame, old_players : pd.DataFrame):
     
     new_players = new_players[["player_id",'code','team_code','full_name','first_name','second_name',"web_name"]].copy()
     
-    # Two images per player, both keyed on stable FPL codes.
-    #
-    # photo_url is the real headshot, keyed on the player's own `code`. Coverage is ~90% of the
-    # current squad; the rest 403 (typically recent signings whose photo has not been shot yet),
-    # which renders as a broken image. kit_url is the team shirt, keyed on `team_code`, and is
-    # always available — keep it as the fallback and for anywhere a club badge reads better.
+    # Real player headshot, keyed on the player's own stable FPL `code`. About 86% of the current
+    # squad resolves; the rest 403 — recent signings whose photo has not been taken — and render
+    # as a broken image. That only affects fringe players in practice: all of the top 50 by
+    # predicted points have one.
     new_players['photo_url'] = new_players['code'].apply(
         lambda code: PLAYER_PHOTO_URL.format(code=int(code))
     )
-    new_players['kit_url'] = new_players['team_code'].apply(
-        lambda code: TEAM_KIT_URL.format(code=int(code))
-    )
 
-    # One-time migration, idempotent: photo_url used to hold the team kit, so any legacy kit URL
-    # is moved to its proper column. Players no longer in the game keep a kit but get no headshot
-    # — the API only exposes `code` for the current squad, so there is nothing to build one from.
+    # photo_url used to hold the team kit. Clear any legacy kit URL so the column is headshots
+    # only. Players no longer in the game end up with nothing, because the API exposes `code`
+    # for the current squad alone and a headshot URL cannot be built without it. Idempotent —
+    # a no-op once the stored file is clean.
     old_players = old_players.copy()
-    if 'kit_url' not in old_players.columns:
-        old_players['kit_url'] = pd.NA
-    _legacy_kit = old_players['photo_url'].astype(str).str.contains('shirts/standard', na=False)
-    old_players.loc[_legacy_kit, 'kit_url'] = old_players.loc[_legacy_kit, 'photo_url']
-    old_players.loc[_legacy_kit, 'photo_url'] = pd.NA
+    old_players.loc[
+        old_players['photo_url'].astype(str).str.contains('shirts/standard', na=False),
+        'photo_url'
+    ] = pd.NA
 
 
     # Add full name column
@@ -370,7 +364,7 @@ def creating_player_ids(new_players : pd.DataFrame, old_players : pd.DataFrame):
     
     # Concatenating players data from season 2020 to 2024 with 2025
     all_players = pd.concat(
-        [old_players, new_players[['player_id','full_name','web_name','photo_url','kit_url']]],
+        [old_players, new_players[['player_id','full_name','web_name','photo_url']]],
         ignore_index=True
     ).drop_duplicates('full_name', keep='last' ,ignore_index=False)
     
@@ -398,9 +392,8 @@ def creating_player_ids(new_players : pd.DataFrame, old_players : pd.DataFrame):
         .apply(lambda x: f"{x[0][0]}. {x[-1]}")
         )
 
-    # Keep the image URLs as the last columns
-    _images = ['photo_url', 'kit_url']
-    all_players = all_players[[c for c in all_players.columns if c not in _images] + _images]
+    # Keep photo_url as the last column
+    all_players = all_players[[c for c in all_players.columns if c != 'photo_url'] + ['photo_url']]
 
     return all_players
 
