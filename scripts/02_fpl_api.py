@@ -613,6 +613,26 @@ master_player_stats_table = map_team_ids(master_player_stats_table, team_dim)
 # MASTER FIXTURE TABLE
 master_fixtures_table = map_team_ids(master_fixtures_table, team_dim)
 
+# Flatten the API's nested `stats` blob into home_/away_ columns and merge them in.
+#
+# Without this, FIXTURES_STATS_COLS below selects columns that do not exist on the frame and
+# upsert_stats writes them as all-NaN. That is exactly what happened: 20 of the 28 columns in
+# fact_fpl_fixture.csv — goals_scored, assists, cards, saves, bonus, bps — were empty for every
+# season from 2025-26 on. 2020-24 looked fine only because that data came from the seed archive,
+# which masked the bug for a full season.
+#
+# Must run AFTER map_team_ids, since the flattener keys on match_id.
+_fixture_stats = create_fixtures_stat_table(master_fixtures_table)
+_new_stat_cols = [c for c in _fixture_stats.columns
+                  if c not in master_fixtures_table.columns and c != 'match_id']
+if _new_stat_cols:
+    master_fixtures_table = master_fixtures_table.merge(
+        _fixture_stats[['match_id'] + _new_stat_cols], on='match_id', how='left'
+    )
+    print(f"Flattened {len(_new_stat_cols)} per-fixture stat columns from the API stats blob.")
+else:
+    print("WARNING — no per-fixture stat columns produced; fact_fpl_fixture stats will be empty.")
+
 # TIME-SERIES FACT TABLES — upsert into existing output to preserve prior seasons.
 # Fresh current-season rows win on key collision (keep='last'); this also subsumes
 # the double-GW deduplication on (gw_id, player_id).

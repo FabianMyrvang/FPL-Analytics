@@ -3,23 +3,48 @@ name: Update FPL data
 on:
   workflow_dispatch:        # manual "Run workflow" button — runs regardless of season
   schedule:
-    # Every 4 hours. Deliberately frequent rather than well-timed, for two reasons:
+    # Frequent rather than well-timed, for two reasons:
     #
     #   1. The source is event-driven. The FPL API flips a gameweek to `finished` only once
     #      bonus points are confirmed — hours after the last match, at no fixed time. A daily
     #      poll misses that by up to 24h no matter which hour it runs. GW2 of 2026-27 was
     #      missed exactly this way.
-    #   2. GitHub's scheduler is best-effort. Observed drift has ranged from 35 minutes to
-    #      11 hours, and runs are silently dropped under load. Polling often makes drift
-    #      irrelevant: a late or dropped run is covered by the next one.
+    #   2. GitHub's scheduler is best-effort: missed runs are DROPPED, not queued or run late,
+    #      and leave no record. Polling often is the only defence.
     #
-    # This is cheap because every run rebuilds all finished gameweeks and upserts, the commit
-    # step is gated on an actual diff, and a run takes ~40s. Public repos have unlimited
-    # Actions minutes. Most runs will log "No data changes to commit."
+    # Cheap: each run rebuilds all finished gameweeks and upserts, the commit step is gated on an
+    # actual diff, and a run takes ~60s. Public repos have unlimited Actions minutes. Most runs
+    # log "No data changes to commit."
     #
-    # :17 avoids :00/:15/:30/:45, the most contended slots. The season-guard step skips the
+    # --- Slot choice is measured, not guessed --------------------------------------------
+    # Delivery rates over 100 runs / 35 days on the previous "17 2,6,10,14,18,22" schedule:
+    #
+    #     02:17 UTC   0%   <- never fired once in 35 days. Removed.
+    #     06:17 UTC  83%
+    #     10:17 UTC  23%   <- moved to 11:17 as an experiment, see below
+    #     14:17 UTC  66%
+    #     18:17 UTC  57%
+    #     22:17 UTC  57%
+    #
+    # Two changes from the original "17 2,6,10,14,18,22":
+    #   * 02:17 dropped as provably dead.
+    #   * 10:17 moved to 11:17. It delivered only 23%, and it is the slot that covers the window
+    #     where the FPL API actually flips a gameweek to `finished`. Losing it cost ~8 hours on
+    #     GW5: the bot found nothing at 10:01 Norwegian time, the 12:17 slot was dropped, and the
+    #     next successful check was 18:29.
+    #
+    # CAVEAT on that 23%: runs land 1-2h after their slot, and a badly delayed 10:17 run would
+    # arrive around 14:xx and be counted against the 14:17 slot instead. So 10:17 may be less
+    # dead than it looks, and 14:17's 66% correspondingly flattered. 11:17 is an experiment, not
+    # a known improvement — re-measure delivery rates in a few weeks before drawing conclusions.
+    #
+    # In Norwegian time these fire at 08:17, 13:17, 16:17, 20:17 and 00:17 — one hour earlier
+    # once winter time starts, since cron is always UTC while a Power BI schedule set in local
+    # time is not. The two drift apart twice a year.
+    #
+    # :17 avoids :00/:15/:30/:45, the most contended minutes. The season-guard step skips the
     # off-season, so the schedule wakes up on its own each 25 August.
-    - cron: "17 2,6,10,14,18,22 * * *"
+    - cron: "17 6,11,14,18,22 * * *"
 
 permissions:
   contents: write           # allow the bot to commit refreshed data back to the repo
