@@ -93,7 +93,21 @@ FPL_GAMEWEEK_COLS = ['match_id','gw_id', 'player_id', 'team_id', 'position_id', 
 # why 2025-26's price and transfer history was flat before the backfill. Freeze them on first
 # write so each gameweek keeps what it had when it was captured. Everything else keeps refreshing,
 # since bonus points and stat corrections land days after a match.
-FROZEN_SNAPSHOT_COLS = ['selected_by_percent', 'now_cost', 'transfers_in', 'transfers_out']
+FROZEN_SNAPSHOT_COLS = ['selected_by_percent', 'now_cost', 'transfers_in', 'transfers_out',
+                        # team_id belongs here for the same reason, and was missed. The API
+                        # reports a player's CURRENT club, so a January transfer rewrote every
+                        # earlier gameweek: Semenyo's 2025-26 GW1-21 for Bournemouth were all
+                        # restamped as Man City. Worse, the fixture is joined on (gw, team_id)
+                        # further up, so match_id followed — his GW1 row pointed at a Man City
+                        # match he never played in.
+                        #
+                        # Freezing fixes both, since match_id derives from team_id. It relies on
+                        # a gameweek being first written while the player is still at that club,
+                        # which holds because the pipeline ingests within hours of a gameweek
+                        # finishing. It would NOT hold if the CSV were deleted and rebuilt from
+                        # scratch after a transfer window — then the first write freezes the
+                        # wrong club.
+                        'team_id']
 
 
 # %%
