@@ -104,7 +104,20 @@ DETAILED_PLAYER_COLS =['match_id','player_id','team_id', 'position_id', 'gw_id',
                    'xgot_faced', 'goals_prevented', 'sweeper_actions',
                    'gk_accurate_passes', 'gk_accurate_long_balls', 'high_claim',
                    'offsides', 'xgot', 'start_min', 'finish_min', 'team_goals_conceded',
-                   'penalties_scored' ]
+                   'penalties_scored',
+                   # Physical/movement stats, new in the 2026-27 feed (metres, except top_speed
+                   # in km/h and number_of_sprints a count). Null for every earlier season —
+                   # the columns simply don't exist there, and reindex below turns them to NaN.
+                   'top_speed', 'distance_covered', 'running_distance',
+                   'sprinting_distance', 'number_of_sprints',
+                   # Present in both seasons' headers, but only 2025-26 has values: the 2026-27
+                   # feed publishes the column empty. Kept because it's an FPL scoring stat and
+                   # may start arriving mid-season.
+                   'defensive_contributions',
+                   ]
+# Deliberately NOT included: walking_distance and corners. Both exist as headers in the 2026-27
+# feed and are empty in every row of every gameweek, so they would only add all-null columns.
+# Add them here if the feed starts populating them.
 
 # %%
 # Pull latest FPL-Core-Insights data (repo must be cloned at the project root).

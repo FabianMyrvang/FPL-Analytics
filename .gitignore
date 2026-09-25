@@ -41,6 +41,12 @@ FPL_DATA/fact_player_points_prediction_history.csv
 FPL_DATA/fact_model_backtest_metric.csv
 FPL_DATA/dim_model.csv
 
+# Power BI report — an encrypted binary git can't diff or merge, and the published report is
+# shared by link instead. Keeping it out also keeps the repo small, which matters because Power
+# BI Service clones it on every refresh.
+Fantasy_Dashboard.pbix
+*.pbix
+
 # Cache directories
 pl_api_cache/
 downloaded_files/
