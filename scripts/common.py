@@ -155,6 +155,15 @@ def upsert_csv(new_df, path, keys, columns=None):
     if columns is not None:
         combined = combined.reindex(columns=columns)
 
+    # Sort on the keys before writing. drop_duplicates(keep="last") moves refreshed rows to
+    # wherever they landed in the concat, so the row order depended on the order the caller
+    # happened to assemble its rows in — which varied slightly between runs. Git saw a diff
+    # on every run and the workflow's "commit only on a real change" gate was defeated:
+    # 19 consecutive scheduled runs committed a reordered file with zero value changes.
+    # mergesort is stable, so equal keys keep their relative order and the output is
+    # reproducible from the same inputs.
+    combined = combined.sort_values(keys, kind="mergesort").reset_index(drop=True)
+
     combined.to_csv(path, index=False)
     print(f"Wrote {path}  ({len(combined)} rows, {len(combined.columns)} cols)")
     return combined

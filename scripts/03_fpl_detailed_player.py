@@ -53,7 +53,7 @@ fixture_dim = pd.read_csv(DIM_FIXTURE)
 season_dim = pd.read_csv(DIM_SEASON)
 
 # %%
-DETAILED_FIXTURE_COLS = ['match_id','gw_id','home_team_id', 'away_team_id','home_team_elo', 'away_team_elo', 'home_possession',
+DETAILED_FIXTURE_COLS = ['match_id','gw_id','home_team_id', 'away_team_id', 'home_possession',
        'away_possession', 'home_expected_goals_xg', 'away_expected_goals_xg',
        'home_total_shots', 'away_total_shots', 'home_shots_on_target',
        'away_shots_on_target', 'home_big_chances', 'away_big_chances',
