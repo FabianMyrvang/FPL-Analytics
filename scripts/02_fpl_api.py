@@ -177,7 +177,8 @@ fpl_api_positions = pd.DataFrame(bootstrap['element_types'])[
 
 # DIM: Gameweeks
 fpl_api_gameweeks = pd.DataFrame(bootstrap['events'])[
-    ['id', 'name', 'deadline_time', 'average_entry_score', 'highest_score', 'finished']
+    ['id', 'name', 'deadline_time', 'average_entry_score', 'highest_score', 'finished',
+     'is_current']
 ].rename(columns={'id': 'gw', 'average_entry_score': 'average_score','name':'gameweek'})
 
 # --- 2. DIM: Fixtures ---
@@ -194,10 +195,22 @@ fpl_api_fixtures = pd.DataFrame(fetch_json("/fixtures/"))[
 })
 
 # --- 3. FACT: PlayerGameweekStats ---
-finished_gws = fpl_api_gameweeks[fpl_api_gameweeks['finished'] == True]['gw'].tolist()
+# Include the CURRENT gameweek, not just finished ones. Gating on `finished` alone left a
+# 2-3 day blind spot: GW6 was fully played on a Monday but its points only appeared late the
+# following day, because `finished` flips on FPL's own processing schedule rather than at the
+# final whistle. The live endpoint returns an empty `elements` list for a gameweek that has
+# not kicked off, so pulling the current one costs nothing when there is nothing to pull.
+#
+# The trade-off: mid-gameweek rows are PROVISIONAL. `bonus` reads 0 until FPL confirms it
+# (the separate `data_checked` flag), and `total_points` moves as bonus lands and as stats are
+# corrected. Every run re-fetches all of these gameweeks and the upsert keeps the newest row,
+# so the numbers converge on the final values without manual intervention.
+target_gws = fpl_api_gameweeks[
+    (fpl_api_gameweeks['finished'] == True) | (fpl_api_gameweeks['is_current'] == True)
+]['gw'].tolist()
 gws = []
 
-for gw in finished_gws:
+for gw in target_gws:
     print(f"Fetching GW{gw} data...")
     gw_data = fetch_json(f"/event/{gw}/live/")
     for el in gw_data['elements']:
@@ -209,14 +222,14 @@ for gw in finished_gws:
 
 gws_df = pd.DataFrame(gws)
 
-# Pre-season / between seasons there are no finished gameweeks, so `gws` is empty and
+# Pre-season / between seasons no gameweek has been played, so `gws` is empty and
 # pd.DataFrame([]) has no columns at all — the merges below would raise KeyError.
 # Seed the merge keys with real dtypes (an untyped empty frame gives object columns,
 # which pandas refuses to merge against int64) so the player-stats path folds through
 # as a no-op upsert and the dims/fixtures still refresh.
-has_finished_gws = not gws_df.empty
-if not has_finished_gws:
-    print("No finished gameweeks yet — skipping player gameweek stats this run.")
+has_gw_rows = not gws_df.empty
+if not has_gw_rows:
+    print("No played gameweeks yet — skipping player gameweek stats this run.")
     gws_df = pd.DataFrame({
         'player_id': pd.Series(dtype='int64'),
         'gw':        pd.Series(dtype='int64'),
@@ -533,11 +546,20 @@ def upsert_stats(master_df, output_path, historical_df, columns, key_cols, freez
     if freeze_cols and os.path.exists(output_path):
         keep = [c for c in freeze_cols if c in base.columns and c in current.columns]
         if keep:
+            dtype_before = {c: current[c].dtype for c in keep}
             prior = base[key_cols + keep].drop_duplicates(subset=key_cols, keep="last")
             current = current.merge(prior, on=key_cols, how="left", suffixes=("", "_prior"))
             for c in keep:
                 was = current[f"{c}_prior"]
-                current[c] = was.where(was.notna(), current[c])
+                merged = was.where(was.notna(), current[c])
+                # The left merge above yields NaN wherever a key is absent from the base, which
+                # is EVERY row of a gameweek being ingested for the first time. That upcasts
+                # int64 to float64, so team_id renders as "5.0" instead of "5" and the whole
+                # 16 MB file is rewritten on the one run that actually adds a gameweek. Restore
+                # the original dtype once the NaNs are gone.
+                if pd.api.types.is_integer_dtype(dtype_before[c]) and merged.notna().all():
+                    merged = merged.astype(dtype_before[c])
+                current[c] = merged
             current = current.drop(columns=[f"{c}_prior" for c in keep])
 
     combined = pd.concat([base, current], ignore_index=True)[columns]
@@ -650,12 +672,12 @@ else:
 # TIME-SERIES FACT TABLES — upsert into existing output to preserve prior seasons.
 # Fresh current-season rows win on key collision (keep='last'); this also subsumes
 # the double-GW deduplication on (gw_id, player_id).
-# With no finished gameweeks there is nothing to upsert. Skip it rather than folding an
+# With no played gameweeks there is nothing to upsert. Skip it rather than folding an
 # empty frame in: concatenating against the saved CSV would upcast every int64 column to
 # float64 and rewrite all 16 MB with 0 -> 0.0 for no gain.
 fpl_gameweek_fact = (
     upsert_stats(master_player_stats_table, FACT_FPL_PLAYER_GW, fpl20_24,            FPL_GAMEWEEK_COLS,   ['gw_id', 'player_id'], freeze_cols=FROZEN_SNAPSHOT_COLS)
-    if has_finished_gws else None
+    if has_gw_rows else None
 )
 fixture_dim     = upsert_stats(master_fixtures_table,     DIM_FIXTURE,        fixtures_df,         FIXTURES_COLS,       ['match_id'])
 season_dim      = upsert_stats(master_fixtures_table,     DIM_SEASON,         fixtures_df,         SEASON_COLS,         ['gw_id']).dropna(subset=['gw_id']).reset_index(drop=True)
