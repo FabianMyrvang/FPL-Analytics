@@ -13,9 +13,8 @@
 # ---
 
 # %%
-# --- repo-root bootstrap: resolve paths relative to the project root ---
-# Lets this code find "seed_data/", "FPL_DATA/", "Fantasy-Premier-League/" etc. whether it is
-# run from notebooks/, scripts/, or the repo root.
+# Repo-root bootstrap: resolve data paths whether this runs from notebooks/, scripts/ or the
+# repo root.
 import os
 from pathlib import Path
 if Path.cwd().name in ("notebooks", "scripts"):
@@ -80,8 +79,8 @@ fpl_merged_df = fpl_merge_func([
 ])
 
 # %%
-# Since the season for 24-25 is not in the full_fpl dataset, we need to append this to the full dataset so that we have all the years from 2020-2024 season
-# Looping through all the csv files and append into a complete 24-25 dataset with all gameweeks
+# The 2024-25 season is absent from the full_fpl dataset. Read each gameweek CSV and append
+# them to produce a complete 2020-2024 history.
 teams_df = pd.read_csv(f'{VAASTAV}/2024-25/teams.csv')
 
 # Empty list
@@ -128,9 +127,8 @@ position_mapping = {
 fpl20_24['position'] = fpl20_24['position'].replace(position_mapping)
 
 # %%
-# There are some differences in the names like for example Adama Traore and Adama Traore Diarra
-# Therefore we need to do fuzzymatching with the fuzzymatch library
-# But first I creata list of unique name
+# Player names differ between sources (e.g. "Adama Traore" vs "Adama Traore Diarra"), so match
+# them with fuzzy matching over a list of unique names.
 
 # Optional: remove leading/trailing spaces as well
 fpl20_24['name'] = fpl20_24['name'].str.strip()

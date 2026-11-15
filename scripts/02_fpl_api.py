@@ -13,10 +13,9 @@
 # ---
 
 # %%
-# --- repo-root bootstrap: resolve paths relative to the project root ---
-# Lets this code find "seed_data/", "FPL_DATA/", "FPL-Core-Insights/" etc. whether it is
-# run from notebooks/, scripts/, or the repo root. We chdir away from scripts/, so put it
-# on sys.path explicitly to keep `import common` working from either location.
+# Repo-root bootstrap: resolve data paths whether this runs from notebooks/, scripts/ or the
+# repo root. chdir moves away from scripts/, so add it to sys.path to keep `import common`
+# working.
 import os
 import sys
 from pathlib import Path
@@ -54,11 +53,9 @@ fpl20_24 = pd.read_csv("seed_data/fpl20_24.csv")
 # %%
 PLAYER_COLS = ['player_id','Full Name','Player Name','photo_url']
 
-# Player headshots. `premierleague25` is a CDN bucket name, not a season mapping — as of
-# 2026-09-20 it is the only one that resolves (premierleague24/26/27 all return 502), and it
-# serves current-squad photos. If headshots start failing wholesale, try bumping the number.
-# The older `…/premierleague/photos/players/110x140/p{code}.png` form also works but covers
-# noticeably less of the squad (39/60 sampled vs 54/60).
+# Player headshots. `premierleague25` is a CDN bucket name, not a season — the neighbouring
+# numbers return 502. If headshots start failing wholesale, try bumping it. The older
+# `.../premierleague/photos/players/110x140/p{code}.png` form works but covers less of the squad.
 PLAYER_PHOTO_URL = "https://resources.premierleague.com/premierleague25/photos/players/110x140/{code}.png"
 
 TEAM_COLS = ['team_id','team','team_badge']
@@ -88,25 +85,19 @@ FPL_GAMEWEEK_COLS = ['match_id','gw_id', 'player_id', 'team_id', 'position_id', 
        'expected_goals_conceded', 'starts','clearances_blocks_interceptions',
        'recoveries', 'tackles','defensive_contribution', 'selected_by_percent']
 
-# Snapshot fields: the API reports only their CURRENT value, but they are merged onto every
-# gameweek row. Refreshing them would stamp today's figure across all 38 weeks — which is exactly
-# why 2025-26's price and transfer history was flat before the backfill. Freeze them on first
-# write so each gameweek keeps what it had when it was captured. Everything else keeps refreshing,
-# since bonus points and stat corrections land days after a match.
+# Snapshot fields: the API reports only their current value, but they are merged onto every
+# gameweek row, so refreshing them would stamp today's figure across all 38 weeks. Frozen on
+# first write, leaving each gameweek with the value captured at the time. Everything else keeps
+# refreshing, since bonus points and stat corrections land days after a match.
 FROZEN_SNAPSHOT_COLS = ['selected_by_percent', 'now_cost', 'transfers_in', 'transfers_out',
-                        # team_id belongs here for the same reason, and was missed. The API
-                        # reports a player's CURRENT club, so a January transfer rewrote every
-                        # earlier gameweek: Semenyo's 2025-26 GW1-21 for Bournemouth were all
-                        # restamped as Man City. Worse, the fixture is joined on (gw, team_id)
-                        # further up, so match_id followed — his GW1 row pointed at a Man City
-                        # match he never played in.
+                        # team_id is frozen for the same reason: the API reports a player's
+                        # current club, so a transfer would otherwise restamp their whole
+                        # season. match_id is joined on (gw, team_id) above and follows along,
+                        # so freezing team_id fixes both.
                         #
-                        # Freezing fixes both, since match_id derives from team_id. It relies on
-                        # a gameweek being first written while the player is still at that club,
-                        # which holds because the pipeline ingests within hours of a gameweek
-                        # finishing. It would NOT hold if the CSV were deleted and rebuilt from
-                        # scratch after a transfer window — then the first write freezes the
-                        # wrong club.
+                        # Assumes a gameweek is first written while the player is still at that
+                        # club, which holds while the pipeline ingests within hours. Deleting
+                        # the CSV and rebuilding after a transfer window freezes the wrong club.
                         'team_id']
 
 
@@ -150,11 +141,9 @@ fpl_api_players["selected_by_percent"] = pd.to_numeric(
     fpl_api_players["selected_by_percent"], errors="coerce"
 )
 
-# The FPL API occasionally renames a club mid-life (2026-27: "Ipswich" -> "Ipswich Town").
-# Matching on the raw name would treat the rename as a debutant, mint a fresh team_id and
-# orphan every prior season of that club's history. Normalise onto the canonical form
-# already stored in team_dim, at source, so every downstream name->id lookup agrees —
-# map_team_ids silently DROPS rows whose team name it cannot resolve.
+# Normalise club names onto the canonical form in team_dim at source, so every downstream
+# name->id lookup agrees. An unmapped rename mints a fresh team_id and orphans that club's
+# history, and map_team_ids drops rows whose name it cannot resolve rather than raising.
 # TEAM_ALIASES lives in scripts/common.py, shared with 03_fpl_detailed_player.py.
 
 # DIM: Teams (include code for kit image URLs)
@@ -195,16 +184,14 @@ fpl_api_fixtures = pd.DataFrame(fetch_json("/fixtures/"))[
 })
 
 # --- 3. FACT: PlayerGameweekStats ---
-# Include the CURRENT gameweek, not just finished ones. Gating on `finished` alone left a
-# 2-3 day blind spot: GW6 was fully played on a Monday but its points only appeared late the
-# following day, because `finished` flips on FPL's own processing schedule rather than at the
-# final whistle. The live endpoint returns an empty `elements` list for a gameweek that has
-# not kicked off, so pulling the current one costs nothing when there is nothing to pull.
+# Includes the current gameweek, not just finished ones: `finished` flips on FPL's own
+# processing schedule rather than at the final whistle, which otherwise delays points by 2-3
+# days. The live endpoint returns an empty `elements` list for a gameweek that has not kicked
+# off, so pulling the current one is free when there is nothing to pull.
 #
-# The trade-off: mid-gameweek rows are PROVISIONAL. `bonus` reads 0 until FPL confirms it
-# (the separate `data_checked` flag), and `total_points` moves as bonus lands and as stats are
-# corrected. Every run re-fetches all of these gameweeks and the upsert keeps the newest row,
-# so the numbers converge on the final values without manual intervention.
+# Mid-gameweek rows are provisional: `bonus` reads 0 until FPL confirms it (the separate
+# `data_checked` flag) and `total_points` moves as stats are corrected. Each run re-fetches
+# these gameweeks and the upsert keeps the newest row, so values converge on their finals.
 target_gws = fpl_api_gameweeks[
     (fpl_api_gameweeks['finished'] == True) | (fpl_api_gameweeks['is_current'] == True)
 ]['gw'].tolist()
@@ -222,11 +209,10 @@ for gw in target_gws:
 
 gws_df = pd.DataFrame(gws)
 
-# Pre-season / between seasons no gameweek has been played, so `gws` is empty and
-# pd.DataFrame([]) has no columns at all — the merges below would raise KeyError.
-# Seed the merge keys with real dtypes (an untyped empty frame gives object columns,
-# which pandas refuses to merge against int64) so the player-stats path folds through
-# as a no-op upsert and the dims/fixtures still refresh.
+# Pre-season there is no played gameweek, so `gws` is empty and pd.DataFrame([]) carries no
+# columns, which makes the merges below raise KeyError. Seed the merge keys with explicit
+# dtypes (an untyped empty frame gives object columns, which will not merge against int64) so
+# the player-stats path folds through as a no-op and the dims/fixtures still refresh.
 has_gw_rows = not gws_df.empty
 if not has_gw_rows:
     print("No played gameweeks yet — skipping player gameweek stats this run.")
@@ -299,9 +285,9 @@ master_fixtures_table = (
 )
 
 # Result
-# Test for nulls FIRST: when no fixture has been played yet the score columns stay
-# object-typed and hold real Nones, and `None > None` raises. Once any fixture has a
-# score pandas types the column float64 and unplayed fixtures read as NaN instead.
+# Test for nulls before comparing: with no fixture played the score columns stay object-typed
+# and hold real Nones, and `None > None` raises. Once any fixture has a score the column is
+# float64 and unplayed fixtures read as NaN.
 master_fixtures_table['result'] = master_fixtures_table.apply(
     lambda row: None if pd.isna(row['home_score']) or pd.isna(row['away_score'])
                 else 'H' if row['home_score'] > row['away_score']
@@ -319,18 +305,16 @@ def creating_player_ids(new_players : pd.DataFrame, old_players : pd.DataFrame):
     
     new_players = new_players[["player_id",'code','team_code','full_name','first_name','second_name',"web_name"]].copy()
     
-    # Real player headshot, keyed on the player's own stable FPL `code`. About 86% of the current
-    # squad resolves; the rest 403 — recent signings whose photo has not been taken — and render
-    # as a broken image. That only affects fringe players in practice: all of the top 50 by
-    # predicted points have one.
+    # Headshot URL keyed on the player's stable FPL `code`. About 86% of the current squad
+    # resolves; the rest 403 (recent signings without a photo yet) and render as a broken
+    # image.
     new_players['photo_url'] = new_players['code'].apply(
         lambda code: PLAYER_PHOTO_URL.format(code=int(code))
     )
 
-    # photo_url used to hold the team kit. Clear any legacy kit URL so the column is headshots
-    # only. Players no longer in the game end up with nothing, because the API exposes `code`
-    # for the current squad alone and a headshot URL cannot be built without it. Idempotent —
-    # a no-op once the stored file is clean.
+    # Clear legacy team-kit URLs so photo_url holds headshots only. Players no longer in the
+    # game end up blank: the API exposes `code` for the current squad alone, and the URL cannot
+    # be built without it. Idempotent once the stored file is clean.
     old_players = old_players.copy()
     old_players.loc[
         old_players['photo_url'].astype(str).str.contains('shirts/standard', na=False),
@@ -552,11 +536,9 @@ def upsert_stats(master_df, output_path, historical_df, columns, key_cols, freez
             for c in keep:
                 was = current[f"{c}_prior"]
                 merged = was.where(was.notna(), current[c])
-                # The left merge above yields NaN wherever a key is absent from the base, which
-                # is EVERY row of a gameweek being ingested for the first time. That upcasts
-                # int64 to float64, so team_id renders as "5.0" instead of "5" and the whole
-                # 16 MB file is rewritten on the one run that actually adds a gameweek. Restore
-                # the original dtype once the NaNs are gone.
+                # The left merge yields NaN wherever a key is absent from the base - every
+                # row of a newly ingested gameweek - which upcasts int64 to float64 and renders
+                # team_id as "5.0", rewriting the whole file. Restore the dtype once filled.
                 if pd.api.types.is_integer_dtype(dtype_before[c]) and merged.notna().all():
                     merged = merged.astype(dtype_before[c])
                 current[c] = merged
@@ -649,13 +631,10 @@ master_player_stats_table = map_team_ids(master_player_stats_table, team_dim)
 # MASTER FIXTURE TABLE
 master_fixtures_table = map_team_ids(master_fixtures_table, team_dim)
 
-# Flatten the API's nested `stats` blob into home_/away_ columns and merge them in.
-#
-# Without this, FIXTURES_STATS_COLS below selects columns that do not exist on the frame and
-# upsert_stats writes them as all-NaN. That is exactly what happened: 20 of the 28 columns in
-# fact_fpl_fixture.csv — goals_scored, assists, cards, saves, bonus, bps — were empty for every
-# season from 2025-26 on. 2020-24 looked fine only because that data came from the seed archive,
-# which masked the bug for a full season.
+# Flatten the API's nested `stats` blob into home_/away_ columns and merge them in. Required:
+# without it FIXTURES_STATS_COLS selects columns absent from the frame and upsert_stats writes
+# them as all-NaN. Seasons before 2025-26 are unaffected, as that data comes from the seed
+# archive.
 #
 # Must run AFTER map_team_ids, since the flattener keys on match_id.
 _fixture_stats = create_fixtures_stat_table(master_fixtures_table)

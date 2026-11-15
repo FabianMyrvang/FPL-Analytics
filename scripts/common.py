@@ -11,10 +11,9 @@ from datetime import datetime
 import pandas as pd
 
 
-# Every published output lives here. Reference these constants rather than literal paths: several
-# reads silently fall back to seed data when their file is missing (upsert_stats, the player/team
-# ID bases, upsert_csv), so a single stale filename would rebuild history and reassign IDs without
-# raising. Keeping the names in one place makes a rename a one-line change.
+# Paths to every published output. Use these constants rather than literal paths: upsert_stats,
+# upsert_csv and the player/team ID bases fall back to seed data when their file is missing, so a
+# stale filename rebuilds history and reassigns IDs without raising.
 DATA_DIR = "FPL_DATA"
 
 DIM_PLAYER = f"{DATA_DIR}/dim_player.csv"
@@ -23,8 +22,8 @@ DIM_POSITION = f"{DATA_DIR}/dim_position.csv"
 DIM_SEASON = f"{DATA_DIR}/dim_season.csv"
 DIM_FIXTURE = f"{DATA_DIR}/dim_fixture.csv"
 
-# Long format — one row per player per upcoming fixture, so it is a fact/bridge rather than a
-# dimension: it fans out 1:many against dim_player.
+# Long format: one row per player per upcoming fixture, so it fans out 1:many against
+# dim_player and is a fact/bridge rather than a dimension.
 FACT_PLAYER_NEXT_FIXTURES = f"{DATA_DIR}/fact_player_next_fixtures.csv"
 FACT_FPL_PLAYER_GW = f"{DATA_DIR}/fact_fpl_player_gw.csv"
 FACT_FPL_FIXTURE = f"{DATA_DIR}/fact_fpl_fixture.csv"
@@ -60,14 +59,10 @@ def get_current_season(today=None):
     return season_short, season_folder
 
 
-# Canonical team names live in FPL_DATA/dim_team.csv. Both the FPL API and
-# FPL-Core-Insights occasionally rename a club mid-life — 2026-27 turned "Ipswich" into
-# "Ipswich Town". Matching on the raw name would treat the rename as a debutant, mint a
-# fresh team_id and orphan every prior season of that club's history. Worse, the elo
-# scripts silently DROP rows whose team name will not resolve, so a rename can delete a
-# club's fixtures rather than raise. Map incoming names onto the canonical form.
-#
-# Also covers the longer FBref spellings used by 04_fpl_detailed_player_backup_scraper.py.
+# Maps source spellings onto the canonical team names in FPL_DATA/dim_team.csv. Both upstream
+# sources rename clubs occasionally (e.g. "Ipswich" -> "Ipswich Town"). An unmapped rename mints
+# a fresh team_id and orphans that club's history, and the detailed scripts drop rows whose team
+# will not resolve rather than raising. Also covers the longer FBref spellings used by 04_.
 TEAM_ALIASES = {
     "Ipswich Town":      "Ipswich",
     "Leicester City":    "Leicester",
@@ -100,16 +95,12 @@ def normalise_team_names(df, col, known_teams=None, label=""):
     return df
 
 
-# Player names are the only key shared between FPL-Core-Insights and player_dim, and the two
-# sources spell them differently. The FPL API also rewrites its own spellings from time to
-# time — 2026-27 turned "Aarón Anselmino" into "Aaron Anselmino" and shortened
-# "Mateus Gonçalo Espanha Fernandes" to "Mateus Fernandes" — while FPL-Core-Insights keeps the
-# long form. Fold accents and case to absorb the cosmetic differences; PLAYER_ALIASES covers
-# the ones folding cannot reach.
+# Player name is the only key shared between FPL-Core-Insights and dim_player, and the two
+# sources spell it differently (accents, and long vs short forms). Folding accents and case
+# absorbs the cosmetic differences; PLAYER_ALIASES covers what folding cannot reach.
 #
-# The durable fix is to join on FPL's stable player `code` (published as `player_code` in
-# FPL-Core-Insights' players.csv) rather than on names at all. That needs player_dim to carry
-# the code, so it is a follow-up rather than a hotfix.
+# TODO: join on FPL's stable player `code` instead of names. FPL-Core-Insights publishes it as
+# `player_code`; this needs dim_player to carry the code first.
 PLAYER_ALIASES = {
     "Julio Enciso Espínola":            "Julio Enciso",
     "Mateus Gonçalo Espanha Fernandes": "Mateus Fernandes",
@@ -155,13 +146,10 @@ def upsert_csv(new_df, path, keys, columns=None):
     if columns is not None:
         combined = combined.reindex(columns=columns)
 
-    # Sort on the keys before writing. drop_duplicates(keep="last") moves refreshed rows to
-    # wherever they landed in the concat, so the row order depended on the order the caller
-    # happened to assemble its rows in — which varied slightly between runs. Git saw a diff
-    # on every run and the workflow's "commit only on a real change" gate was defeated:
-    # 19 consecutive scheduled runs committed a reordered file with zero value changes.
-    # mergesort is stable, so equal keys keep their relative order and the output is
-    # reproducible from the same inputs.
+    # Sort before writing so the output is reproducible from the same inputs. Without this,
+    # drop_duplicates(keep="last") leaves rows wherever the concat put them, so row order varies
+    # between runs and every run produces a git diff with no value changes. mergesort is stable,
+    # so equal keys keep their relative order.
     combined = combined.sort_values(keys, kind="mergesort").reset_index(drop=True)
 
     combined.to_csv(path, index=False)

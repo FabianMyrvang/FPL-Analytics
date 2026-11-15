@@ -13,10 +13,9 @@
 # ---
 
 # %%
-# --- repo-root bootstrap: resolve paths relative to the project root ---
-# Lets this code find "FPL_DATA/", "FPL-Core-Insights/" etc. whether it is
-# run from notebooks/, scripts/, or the repo root. We chdir away from scripts/, so put it
-# on sys.path explicitly to keep `import common` working from either location.
+# Repo-root bootstrap: resolve data paths whether this runs from notebooks/, scripts/ or the
+# repo root. chdir moves away from scripts/, so add it to sys.path to keep `import common`
+# working.
 import os
 import sys
 from pathlib import Path
@@ -82,11 +81,10 @@ DETAILED_FIXTURE_COLS = ['match_id','gw_id','home_team_id', 'away_team_id', 'hom
        'away_aerial_duels_won', 'home_successful_dribbles',
        'away_successful_dribbles']
 
-# The written schema for fact_detailed_fixture.csv: the stat columns above plus the descriptive
-# ones worth keeping. Deliberately excludes upstream internals that carry no analytical
-# value — home_team/away_team (raw source codes, already resolved to *_team_id),
-# match_url, fotmob_id, stats_processed, player_stats_processed, tournament, and GW
-# (duplicates `gameweek`, and gw_id already encodes it).
+# Written schema for fact_detailed_fixture.csv: the stat columns above plus the descriptive
+# ones worth keeping. Excludes upstream internals with no analytical value - home_team/away_team
+# (raw source codes, resolved to *_team_id), match_url, fotmob_id, stats_processed,
+# player_stats_processed, tournament, and GW (duplicates `gameweek`).
 DETAILED_FIXTURE_OUTPUT_COLS = DETAILED_FIXTURE_COLS + [
     'gameweek', 'home_score', 'away_score', 'finished',
     'home_team_name', 'away_team_name', 'season',
@@ -105,25 +103,23 @@ DETAILED_PLAYER_COLS =['match_id','player_id','team_id', 'position_id', 'gw_id',
                    'gk_accurate_passes', 'gk_accurate_long_balls', 'high_claim',
                    'offsides', 'xgot', 'start_min', 'finish_min', 'team_goals_conceded',
                    'penalties_scored',
-                   # Physical/movement stats, new in the 2026-27 feed (metres, except top_speed
-                   # in km/h and number_of_sprints a count). Null for every earlier season —
-                   # the columns simply don't exist there, and reindex below turns them to NaN.
+                   # Movement stats, available from the 2026-27 feed onward. Metres, except
+                   # top_speed (km/h) and number_of_sprints (count). Absent from earlier
+                   # seasons, where the reindex below yields NaN.
                    'top_speed', 'distance_covered', 'running_distance',
                    'sprinting_distance', 'number_of_sprints',
-                   # Present in both seasons' headers, but only 2025-26 has values: the 2026-27
-                   # feed publishes the column empty. Kept because it's an FPL scoring stat and
-                   # may start arriving mid-season.
+                   # Populated in 2025-26 only; the 2026-27 feed publishes the column empty.
+                   # Retained as an FPL scoring stat in case the feed resumes. See
+                   # fact_fpl_player_gw.defensive_contribution for the FPL API equivalent.
                    'defensive_contributions',
                    ]
-# Deliberately NOT included: walking_distance and corners. Both exist as headers in the 2026-27
-# feed and are empty in every row of every gameweek, so they would only add all-null columns.
-# Add them here if the feed starts populating them.
+# Excluded: walking_distance and corners. Both are published as headers with no values in any
+# gameweek, so including them would only add all-null columns. Add them here if that changes.
 
 # %%
-# Pull latest FPL-Core-Insights data (repo must be cloned at the project root).
-# Don't let a pull failure kill the run: CI clones the repo fresh so the pull is redundant
-# there, and locally a dirty working tree in that mirror would otherwise abort the whole
-# pipeline. Warn and carry on with whatever data is already on disk.
+# Pull the latest FPL-Core-Insights data; the repo must be cloned at the project root.
+# A pull failure is non-fatal: CI clones fresh so the pull is redundant there, and a dirty
+# working tree in a local mirror should not abort the pipeline. Warn and use what is on disk.
 git_dir = "FPL-Core-Insights"
 try:
     git.cmd.Git(git_dir).pull()
@@ -139,8 +135,8 @@ except Exception as exc:
 # The per-player table is built further down.
 
 # %%
-# FPL-Core-Insights only creates the season folder once it starts publishing. Exit cleanly
-# rather than raising a bare FileNotFoundError from inside a read_csv.
+# The season folder only exists once FPL-Core-Insights starts publishing. Exit cleanly rather
+# than raising FileNotFoundError from inside a read_csv.
 if not os.path.isdir(DETAILED_DATA_DIR):
     print(f"{DETAILED_DATA_DIR} does not exist yet — FPL-Core-Insights has not published "
           f"{SEASON_FOLDER} data. Leaving existing FPL_DATA CSVs untouched.")
@@ -149,9 +145,9 @@ if not os.path.isdir(DETAILED_DATA_DIR):
 detailed_players = pd.read_csv(f"{DETAILED_DATA_DIR}/players.csv")
 detailed_teams = pd.read_csv(f"{DETAILED_DATA_DIR}/teams.csv")
 
-# Upstream uses the same club names as the FPL API ("Ipswich Town"), while team_dim's
-# canonical form is "Ipswich". An unresolved name yields a NaN team_id, and those rows are
-# then silently dropped — so normalise before any merge onto team_dim.
+# Upstream uses the FPL API's club names ("Ipswich Town"); team_dim's canonical form is
+# "Ipswich". An unresolved name yields a NaN team_id and the row is dropped, so normalise
+# before merging onto team_dim.
 detailed_teams = normalise_team_names(
     detailed_teams, "name", team_dim["team"], label="FPL-Core-Insights teams.csv"
 )
@@ -175,9 +171,9 @@ for gw in range(1, 39):
             # Convert to string, strip whitespace, lowercase, then compare
             df = df[df["finished"].astype(str).str.strip().str.lower() == "true"]
 
-        # Drop empty columns — but only when rows survived the `finished` filter above.
-        # On a 0-row frame every column is trivially "all NaN", so this would drop the
-        # entire schema and the merges below would fail with KeyError.
+        # Drop empty columns, but only when rows survived the `finished` filter above: on a
+        # 0-row frame every column is trivially all-NaN, which would drop the whole schema and
+        # make the merges below raise KeyError.
         if not df.empty:
             df = df.dropna(axis=1, how='all')
 
@@ -186,9 +182,9 @@ for gw in range(1, 39):
         break
 
 
-# Every GW folder now exists from the start of a season, so the loop above reads all 38 and
-# most yield zero finished fixtures early on. A 0-row frame still carries its columns, so the
-# merges below are safe; only a completely empty list would break pd.concat.
+# All 38 GW folders exist from the start of a season, so most yield zero finished fixtures
+# early on. A 0-row frame still carries its columns, so the merges below are safe; only a
+# completely empty list would break pd.concat.
 if not detailed_fixtures:
     print(f"No gameweek folders found under {detailed_path} — nothing to process.")
     sys.exit(0)
@@ -218,10 +214,9 @@ detailed_fixtures['match_id'] = (detailed_fixtures['season'].str[:4] + detailed_
 detailed_fixtures['gw_id'] = detailed_fixtures['match_id'].astype(str).str[:4].astype(int) * 100 + detailed_fixtures['GW'].astype(int)
 
 # %%
-# Pin the output schema. The previous ">10% NaN" filter made the column set data-dependent,
-# so the file silently changed width as the season filled in (93 -> 95 during 2025-26) and
-# broke consumers that assumed a fixed layout. It also divided by len(df), which is zero
-# before any match is played. Reindexing is deterministic: absent columns arrive as NaN.
+# Pin the output schema. A NaN-ratio filter would make the column set data-dependent, so the
+# file would change width as the season fills in and break consumers that assume a fixed
+# layout. Reindexing is deterministic: absent columns arrive as NaN.
 detailed_fixtures = detailed_fixtures.reindex(columns=DETAILED_FIXTURE_OUTPUT_COLS)
 
 # %%
@@ -267,9 +262,9 @@ if not detailed_player_stats:
 
 detailed_player_stats = pd.concat(detailed_player_stats, ignore_index=True)
 
-# Before the season starts these files are header-only. With zero rows every column
-# trivially satisfies "all values == 0" and would be dropped below, after which the
-# explicit drop list raises KeyError. There is nothing to upsert either way.
+# These files are header-only before the season starts. With zero rows every column trivially
+# satisfies "all values == 0" and would be dropped below, after which the explicit drop list
+# raises KeyError. There is nothing to upsert either way.
 if detailed_player_stats.empty:
     print(f"No player match stats published yet — leaving {FACT_DETAILED_PLAYER_GW} untouched.")
     sys.exit(0)
@@ -303,11 +298,9 @@ detailed_player_stats["season"] = SEASON_SHORT
 detailed_player_stats['match_id'] = (detailed_player_stats['season'].str[:4] + detailed_player_stats["home_team_id"].astype(str).str.zfill(2) + detailed_player_stats['away_team_id'].astype(str).str.zfill(2)).astype('Int64')
 
 # %%
-# Getting the player id from the player dim table.
-# Join on a folded key rather than the raw name: FPL-Core-Insights and player_dim spell the
-# same player differently, and the FPL API periodically rewrites its own spelling (2026-27
-# dropped the accents from "Aarón Anselmino" and shortened several Portuguese names), which
-# silently produced NaN player_ids. See PLAYER_ALIASES in common.py.
+# Resolve player_id from dim_player. Join on a folded key rather than the raw name: the two
+# sources spell the same player differently, and the FPL API rewrites its own spellings
+# periodically, which yields NaN player_ids. See PLAYER_ALIASES in common.py.
 _pdim = player_dim[["player_id", "full_name"]].copy()
 _pdim["_name_key"] = player_name_key(_pdim["full_name"])
 _pdim = _pdim.drop(columns=["full_name"])
@@ -364,7 +357,8 @@ detailed_player_stats["was_home"] = (detailed_player_stats["team_id"] == detaile
 
 # %%
 # reindex rather than strict selection: the all-zero pass above legitimately removes columns
-# early in a season, and [DETAILED_PLAYER_COLS] would then raise KeyError. Missing ones become NaN.
+# early in a season, which would make [DETAILED_PLAYER_COLS] raise KeyError. Absent ones
+# become NaN.
 detailed_player_stats = detailed_player_stats.reindex(columns=DETAILED_PLAYER_COLS)
 
 # %%

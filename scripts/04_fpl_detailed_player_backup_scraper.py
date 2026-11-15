@@ -13,10 +13,9 @@
 # ---
 
 # %%
-# --- repo-root bootstrap: resolve paths relative to the project root ---
-# Lets this code find "seed_data/", "FPL_DATA/", "FPL-Core-Insights/" etc. whether it is
-# run from notebooks/, scripts/, or the repo root. We chdir away from scripts/, so put it
-# on sys.path explicitly to keep `import common` working from either location.
+# Repo-root bootstrap: resolve data paths whether this runs from notebooks/, scripts/ or the
+# repo root. chdir moves away from scripts/, so add it to sys.path to keep `import common`
+# working.
 import os
 import sys
 from pathlib import Path
@@ -29,22 +28,22 @@ if Path.cwd().name in ("notebooks", "scripts"):
 from common import DIM_PLAYER, DIM_POSITION, DIM_TEAM, FACT_FPL_PLAYER_GW, FACT_DETAILED_PLAYER_GW
 
 # %% [markdown]
-# # FPL ELO Player Stats — Combined Old Pipeline + FBref
+# # Detailed Player Stats — FPL-Core-Insights + FBref fallback
 #
 # Combines two data sources to produce per-match player statistics:
 #
-# **Old pipeline (FPL-Core-Insights / Opta)** — primary source for all stat columns.
+# **FPL-Core-Insights (Opta)** — primary source for all stat columns.
 # - `FPL-Core-Insights/data/2025-2026/By Tournament/Premier League/GW{n}/playermatchstats.csv`
 # - Rich Opta stats: touches, accurate_passes, xgot, dribbles, duels, etc.
 # - Degrades after ~GW26 for some columns; GW33+ is empty.
 #
-# **FBref (via `soccerdata`)** — structural base + gap-filler.
+# **FBref (via `soccerdata`)** — structural base and gap-filler.
 # - Provides match/player identity and position for all GWs.
-# - Fills nulls left by old pipeline degradation.
-# - Sole source for GW27+ rows where old pipeline is empty.
-# - `start_min` / `finish_min` computed from FBref minutes-played (old pipeline values unreliable).
+# - Fills nulls left where the primary source degrades.
+# - Sole source for rows the primary source does not cover.
+# - `start_min` / `finish_min` computed from FBref minutes played, which are more reliable.
 #
-# **Output:** `FPL_DATA/fact_detailed_player_gw.csv` (40 columns)
+# **Output:** `FPL_DATA/fact_detailed_player_gw.csv`
 
 # %%
 # # !pip install soccerdata rapidfuzz requests beautifulsoup4
@@ -339,8 +338,8 @@ print(f"Cached    : {cached} / {len(sched_flat)} pages")
 print(f"Driver    : {'ready' if hasattr(fbref, '_driver') else 'NOT FOUND'}")
 
 # %%
-# Uses fbref._driver (soccerdata Chrome) -- bypasses Cloudflare, no rate limit needed.
-# First run ~30 min (330 pages x ~6 s each). Subsequent runs instant from cache.
+# Uses fbref._driver (soccerdata's Chrome instance) to get past Cloudflare; no rate limit
+# needed. First run takes ~30 min (330 pages at ~6s each); later runs are served from cache.
 all_tables = []
 rows   = sched_flat[sched_flat["match_report"].notna()]
 total  = len(rows)
@@ -412,9 +411,9 @@ for c in keeper_df.columns.tolist():
     print(f"  {c}")
 
 # %%
-# ── OLD PIPELINE: Full processing (mirrors fpl_elo_old_version.ipynb) ─────────
-# Primary data source for all GWs where FPL-Core-Insights has data.
-# team_goals_conceded, start_min, finish_min, xgot etc. come directly from here.
+# ── PRIMARY SOURCE: FPL-Core-Insights processing ─────────────────────────────
+# Used for every GW where FPL-Core-Insights has data. team_goals_conceded, start_min,
+# finish_min and xgot come directly from here.
 
 ELO_BASE = "FPL-Core-Insights/data/2025-2026"
 ELO_PL   = f"{ELO_BASE}/By Tournament/Premier League"
@@ -572,9 +571,9 @@ for col in FBREF_OVERRIDE_COLS:
 
 df_combined = pd.concat([old_early, old_late], ignore_index=True)
 
-# ── STEP 3: Add FBref rows for any (match_id, player_id) not in old pipeline ─
-# Uses (match_id, player_id) pairs so players missing from old pipeline for
-# specific GWs (e.g. GW30-33 gaps) are filled in from FBref.
+# ── STEP 3: Add FBref rows for any (match_id, player_id) the primary source lacks ─
+# Keyed on (match_id, player_id) so players absent from the primary source for specific
+# gameweeks are filled in from FBref.
 old_keys = pd.MultiIndex.from_arrays([
     df_combined["match_id"].dropna().astype(int),
     df_combined["player_id"].dropna().astype(int),
